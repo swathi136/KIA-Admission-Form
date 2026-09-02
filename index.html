@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Admission Data Form - Kumaraguru Institute of Agriculture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===================== TOP BAR ===================== -->
+<header class="topbar">
+  <div class="topbar__brand">
+    <img src="logo.png" alt="Kumaraguru Institution of Agriculture Logo" class="topbar__logo">
+    <div>
+      <p class="topbar__title">Kumaraguru Institute of Agriculture</p>
+      <p class="topbar__subtitle">Student Admission Data Form - Batch 2026</p>
+    </div>
+  </div>
+  <div class="topbar__meta">
+    <span class="save-indicator" id="saveIndicator">Draft saved</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ===================== SIDEBAR / STEP RAIL ===================== -->
+  <nav class="rail" id="rail" aria-label="Form sections">
+    <ol class="rail__list" id="railList">
+      <!-- populated by script.js -->
+    </ol>
+    <div class="rail__progress">
+      <div class="rail__progress-bar">
+        <div class="rail__progress-fill" id="progressFill"></div>
+      </div>
+      <p class="rail__progress-text"><span id="progressPercent">0</span>% complete</p>
+    </div>
+  </nav>
+
+  <!-- ===================== MAIN FORM ===================== -->
+  <main class="main">
+    <form id="admissionForm" novalidate>
+
+      <!-- Section: Identity -->
+      <section class="panel" data-section="identity" data-color="blue">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 1</p>
+          <h2>Identity</h2>
+          <p class="panel__desc">Basic personal details as they should appear on official records.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="studentName">Student name <span class="req">*</span></label>
+            <input type="text" id="studentName" name="studentName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed" placeholder="As in Class XII mark sheet">
+          </div>
+          <div class="field">
+            <label for="dob">Date of birth <span class="req">*</span></label>
+            <input type="date" id="dob" name="dob" required>
+          </div>
+          <div class="field">
+            <label for="gender">Gender <span class="req">*</span></label>
+            <select id="gender" name="gender" required>
+              <option value="" disabled selected>Select</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="bloodGroup">Blood group <span class="req">*</span></label>
+            <select id="bloodGroup" name="bloodGroup" required>
+              <option value="" disabled selected>Select</option>
+              <option>A+</option><option>A-</option>
+              <option>B+</option><option>B-</option>
+              <option>AB+</option><option>AB-</option>
+              <option>O+</option><option>O-</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field" id="bloodGroupOtherField" style="display: none;">
+            <label for="bloodGroupOther">Specify blood group</label>
+            <input type="text" id="bloodGroupOther" name="bloodGroupOther" placeholder="Enter your blood group">
+          </div>
+          <div class="field">
+            <label for="nationality">Nationality</label>
+            <input type="text" id="nationality" name="nationality" value="Indian">
+          </div>
+          <div class="field">
+            <label for="religion">Religion <span class="req">*</span></label>
+            <select id="religion" name="religion" required>
+              <option value="" disabled selected>Select</option>
+              <option>Hindu</option>
+              <option>Christian</option>
+              <option>Muslim</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="community">Community <span class="req">*</span></label>
+            <select id="community" name="community" required>
+              <option value="" disabled selected>Select</option>
+              <option>OC</option><option>BCM</option><option>BC</option>
+              <option>MBC</option><option>SCA</option><option>SC</option>
+              <option>ST</option><option>DNC</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field" id="communityOtherField" style="display: none;">
+            <label for="communityOther">Specify community</label>
+            <input type="text" id="communityOther" name="communityOther" placeholder="Enter your community">
+          </div>
+          <div class="field">
+            <label for="caste">Caste <span class="req">*</span></label>
+            <input type="text" id="caste" name="caste" required>
+          </div>
+          <div class="field">
+            <label for="motherTongue">Mother tongue <span class="req">*</span></label>
+            <input type="text" id="motherTongue" name="motherTongue" required>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Admission -->
+      <section class="panel" data-section="admission" data-color="green">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 2</p>
+          <h2>Admission</h2>
+          <p class="panel__desc">Details of how and where the student is being admitted.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="tnauNumber">TNAU allotment number <span class="req">*</span></label>
+            <input type="text" id="tnauNumber" name="tnauNumber" required>
+          </div>
+          <div class="field">
+            <label for="admissionType">Admission type <span class="req">*</span></label>
+            <select id="admissionType" name="admissionType" required>
+              <option value="" disabled selected>Select</option>
+              <option>Counselling</option>
+              <option>Management</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="admissionQuota">Admission quota <span class="req">*</span></label>
+            <select id="admissionQuota" name="admissionQuota" required>
+              <option value="" disabled selected>Select</option>
+              <option>General</option>
+              <option>Management</option>
+              <option>7.5% Academic</option>
+              <option>General Vocational</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="firstGraduate">First graduate? <span class="req">*</span></label>
+            <select id="firstGraduate" name="firstGraduate" required>
+              <option value="" disabled selected>Select</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="hostelStatus">Have you opted for hostel accommodation? <span class="req">*</span></label>
+            <select id="hostelStatus" name="hostelStatus" required>
+              <option value="" disabled selected>Select</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="course">Course / Programme <span class="req">*</span></label>
+            <input type="text" id="course" name="course" required placeholder="e.g. B.Sc (Hons) Agriculture">
+          </div>
+          <div class="field">
+            <label for="batch">Academic year / Batch <span class="req">*</span></label>
+            <input type="text" id="batch" name="batch" required placeholder="e.g. 2026-2030">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Contact -->
+      <section class="panel" data-section="contact" data-color="yellow">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 3</p>
+          <h2>Contact</h2>
+          <p class="panel__desc">How the institution should reach the student and family in an emergency.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="studentMobile">Student mobile <span class="req">*</span></label>
+            <input type="tel" id="studentMobile" name="studentMobile" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric" placeholder="10-digit number">
+          </div>
+          <div class="field">
+            <label class="field__copy" for="sameAsMobile"><input type="checkbox" id="sameAsMobile"> Same as student mobile</label>
+            <label for="whatsapp">WhatsApp number <span class="req">*</span></label>
+            <input type="tel" id="whatsapp" name="whatsapp" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="email">Email <span class="req">*</span></label>
+            <input type="email" id="email" name="email" required>
+            <small class="field__hint">Confirmation will be sent to this email address</small>
+          </div>
+          <div class="field field--wide">
+            <label for="commAddress">Communication address</label>
+            <textarea id="commAddress" name="commAddress" rows="2"></textarea>
+          </div>
+          <div class="field field--wide">
+            <label class="field__copy" for="sameAsCommAddress"><input type="checkbox" id="sameAsCommAddress"> Same as communication address</label>
+            <label for="permAddress">Permanent address</label>
+            <textarea id="permAddress" name="permAddress" rows="2"></textarea>
+          </div>
+          <div class="field">
+            <label for="district">District <span class="req">*</span></label>
+            <input type="text" id="district" name="district" required>
+          </div>
+          <div class="field">
+            <label for="state">State <span class="req">*</span></label>
+            <input type="text" id="state" name="state" required value="Tamil Nadu">
+          </div>
+          <div class="field">
+            <label for="pincode">PIN code <span class="req">*</span></label>
+            <input type="text" id="pincode" name="pincode" required pattern="[0-9]{6}" placeholder="6-digit code">
+          </div>
+          <div class="field">
+            <label for="emergency1">Emergency contact 1 <span class="req">*</span></label>
+            <input type="tel" id="emergency1" name="emergency1" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="emergency2">Emergency contact 2</label>
+            <input type="tel" id="emergency2" name="emergency2" pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: X Education -->
+      <section class="panel" data-section="xedu" data-color="orange">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 4</p>
+          <h2>Class X education</h2>
+          <p class="panel__desc">Details from the Class X mark sheet and school records.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="xBoard">X board <span class="req">*</span></label>
+            <input type="text" id="xBoard" name="xBoard" required placeholder="e.g. State Board, CBSE">
+          </div>
+          <div class="field">
+            <label for="xSchool">X school name <span class="req">*</span></label>
+            <input type="text" id="xSchool" name="xSchool" required>
+          </div>
+          <div class="field field--wide">
+            <label for="xSchoolAddress">X school address <span class="req">*</span></label>
+            <textarea id="xSchoolAddress" name="xSchoolAddress" rows="2" required></textarea>
+          </div>
+          <div class="field">
+            <label for="xPassing">Month &amp; year of passing <span class="req">*</span></label>
+            <input type="month" id="xPassing" name="xPassing" required>
+          </div>
+          <div class="field">
+            <label for="xMedium">Medium of instruction <span class="req">*</span></label>
+            <input type="text" id="xMedium" name="xMedium" required>
+          </div>
+          <div class="field">
+            <label for="xMarks">Marks <span class="req">*</span></label>
+            <input type="text" id="xMarks" name="xMarks" required>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: XII Education -->
+      <section class="panel" data-section="xiiedu" data-color="red">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 5</p>
+          <h2>Class XII education</h2>
+          <p class="panel__desc">Details from the Class XII mark sheet and school records.</p>
+        </div>
+        <label class="field__copy field__copy--standalone"><input type="checkbox" id="sameAsX"> Same as Class X (board, school, address, medium)</label>
+        <div class="grid">
+          <div class="field">
+            <label for="xiiBoard">XII board <span class="req">*</span></label>
+            <input type="text" id="xiiBoard" name="xiiBoard" required>
+          </div>
+          <div class="field">
+            <label for="xiiSchool">XII school name <span class="req">*</span></label>
+            <input type="text" id="xiiSchool" name="xiiSchool" required>
+          </div>
+          <div class="field field--wide">
+            <label for="xiiSchoolAddress">XII school address <span class="req">*</span></label>
+            <textarea id="xiiSchoolAddress" name="xiiSchoolAddress" rows="2" required></textarea>
+          </div>
+          <div class="field">
+            <label for="xiiPassing">Month &amp; year of passing <span class="req">*</span></label>
+            <input type="month" id="xiiPassing" name="xiiPassing" required>
+          </div>
+          <div class="field">
+            <label for="xiiMedium">Medium of instruction <span class="req">*</span></label>
+            <input type="text" id="xiiMedium" name="xiiMedium" required>
+          </div>
+          <div class="field">
+            <label for="xiiMarks">Marks <span class="req">*</span></label>
+            <input type="text" id="xiiMarks" name="xiiMarks" required>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: XII Detailed Marks -->
+      <section class="panel" data-section="xiimarks" data-color="purple">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 6</p>
+          <h2>Class XII subject-wise marks</h2>
+          <p class="panel__desc">Leave a subject blank if it was not part of the student's group.</p>
+        </div>
+        <div class="grid grid--marks">
+          <div class="field"><label for="mLanguage">Language</label><input type="number" id="mLanguage" name="mLanguage" min="0" max="100"></div>
+          <div class="field"><label for="mEnglish">English</label><input type="number" id="mEnglish" name="mEnglish" min="0" max="100"></div>
+          <div class="field"><label for="mMaths">Mathematics</label><input type="number" id="mMaths" name="mMaths" min="0" max="100"></div>
+          <div class="field"><label for="mPhysics">Physics</label><input type="number" id="mPhysics" name="mPhysics" min="0" max="100"></div>
+          <div class="field"><label for="mChemistry">Chemistry</label><input type="number" id="mChemistry" name="mChemistry" min="0" max="100"></div>
+          <div class="field"><label for="mBiology">Biology</label><input type="number" id="mBiology" name="mBiology" min="0" max="100"></div>
+          <div class="field"><label for="mBotany">Botany</label><input type="number" id="mBotany" name="mBotany" min="0" max="100"></div>
+          <div class="field"><label for="mZoology">Zoology</label><input type="number" id="mZoology" name="mZoology" min="0" max="100"></div>
+          <div class="field"><label for="mComputerScience">Computer science</label><input type="number" id="mComputerScience" name="mComputerScience" min="0" max="100"></div>
+          <div class="field"><label for="mTotal">Total marks</label><input type="number" id="mTotal" name="mTotal" min="0"></div>
+          <div class="field"><label for="xiiCutoff">XII cut-off</label><input type="text" id="xiiCutoff" name="xiiCutoff"></div>
+          <div class="field"><label for="emisNumber">EMIS number</label><input type="text" id="emisNumber" name="emisNumber"></div>
+        </div>
+      </section>
+
+      <!-- Section: Family -->
+      <section class="panel" data-section="family" data-color="brown">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 7</p>
+          <h2>Family</h2>
+          <p class="panel__desc">Parent or guardian details for institutional records and correspondence.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="fatherName">Father / guardian name <span class="req">*</span></label>
+            <input type="text" id="fatherName" name="fatherName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field">
+            <label for="fatherQualification">Father's qualification <span class="req">*</span></label>
+            <input type="text" id="fatherQualification" name="fatherQualification" required>
+          </div>
+          <div class="field">
+            <label for="fatherOccupation">Father's occupation <span class="req">*</span></label>
+            <input type="text" id="fatherOccupation" name="fatherOccupation" required>
+          </div>
+          <div class="field">
+            <label for="fatherCompany">Father's company / organisation</label>
+            <input type="text" id="fatherCompany" name="fatherCompany">
+          </div>
+          <div class="field">
+            <label for="fatherEmail">Father's email</label>
+            <input type="email" id="fatherEmail" name="fatherEmail">
+          </div>
+          <div class="field">
+            <label for="fatherMobile">Father's mobile <span class="req">*</span></label>
+            <input type="tel" id="fatherMobile" name="fatherMobile" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="motherName">Mother's name <span class="req">*</span></label>
+            <input type="text" id="motherName" name="motherName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field">
+            <label for="motherQualification">Mother's qualification <span class="req">*</span></label>
+            <input type="text" id="motherQualification" name="motherQualification" required>
+          </div>
+          <div class="field">
+            <label for="motherOccupation">Mother's occupation <span class="req">*</span></label>
+            <input type="text" id="motherOccupation" name="motherOccupation" required>
+          </div>
+          <div class="field">
+            <label for="motherCompany">Mother's company / organisation</label>
+            <input type="text" id="motherCompany" name="motherCompany">
+          </div>
+          <div class="field">
+            <label for="motherEmail">Mother's email</label>
+            <input type="email" id="motherEmail" name="motherEmail">
+          </div>
+          <div class="field">
+            <label for="motherMobile">Mother's mobile <span class="req">*</span></label>
+            <input type="tel" id="motherMobile" name="motherMobile" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="familyIncome">Annual family income <span class="req">*</span></label>
+            <input type="text" id="familyIncome" name="familyIncome" required placeholder="in &#8377;">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: School & Social Background -->
+      <section class="panel" data-section="social" data-color="teal">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 8</p>
+          <h2>School &amp; social background</h2>
+          <p class="panel__desc">Used only for institutional diversity and outreach reporting.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="boardOfStudy">Board of study <span class="req">*</span></label>
+            <input type="text" id="boardOfStudy" name="boardOfStudy" required>
+          </div>
+          <div class="field">
+            <label for="mediumOfStudy">Medium of study <span class="req">*</span></label>
+            <input type="text" id="mediumOfStudy" name="mediumOfStudy" required>
+          </div>
+          <div class="field">
+            <label for="schoolType">School type <span class="req">*</span></label>
+            <select id="schoolType" name="schoolType" required>
+              <option value="" disabled selected>Select</option>
+              <option>Government</option>
+              <option>Government-aided</option>
+              <option>Private</option>
+              <option>Matriculation</option>
+              <option>CBSE</option>
+              <option>ICSE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="tamilXii">Studied Tamil in XII <span class="req">*</span></label>
+            <select id="tamilXii" name="tamilXii" required>
+              <option value="" disabled selected>Select</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="familyBackground">Family background <span class="req">*</span></label>
+            <select id="familyBackground" name="familyBackground" required>
+              <option value="" disabled selected>Select</option>
+              <option>Agriculture</option>
+              <option>Business</option>
+              <option>Salaried</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Agricultural Background -->
+      <section class="panel" data-section="agri" data-color="leaf">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 9</p>
+          <h2>Agricultural background</h2>
+          <p class="panel__desc">Helps the institution match students to relevant field programmes and research.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="landAvailability">Agricultural land availability</label>
+            <select id="landAvailability" name="landAvailability">
+              <option value="" selected>Select</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="landArea">Agricultural land area</label>
+            <input type="text" id="landArea" name="landArea" placeholder="in acres">
+          </div>
+          <div class="field field--wide">
+            <label for="majorCrops">Major crops planted</label>
+            <input type="text" id="majorCrops" name="majorCrops">
+          </div>
+          <div class="field">
+            <label for="landLocality">Agricultural land locality</label>
+            <select id="landLocality" name="landLocality">
+              <option value="" selected>Select</option>
+              <option>Rural</option>
+              <option>Semi-urban</option>
+              <option>Urban</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="residenceType">Residence type</label>
+            <select id="residenceType" name="residenceType">
+              <option value="" selected>Select</option>
+              <option>Own house</option>
+              <option>Rented</option>
+              <option>Farm house</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Additional Official KIA Information -->
+      <section class="panel" data-section="bank" data-color="navy">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 10</p>
+          <h2>Additional official information</h2>
+          <p class="panel__desc">Bank and identity details used for scholarships, refunds and loan processing. Shared only with authorised institution staff.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="bankHolder">Bank account holder name <span class="req">*</span></label>
+            <input type="text" id="bankHolder" name="bankHolder" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field">
+            <label for="holderRelationship">Relationship with account holder <span class="req">*</span></label>
+            <input type="text" id="holderRelationship" name="holderRelationship" required>
+          </div>
+          <div class="field">
+            <label for="bankName">Bank name <span class="req">*</span></label>
+            <input type="text" id="bankName" name="bankName" required>
+          </div>
+          <div class="field">
+            <label for="bankBranch">Bank branch <span class="req">*</span></label>
+            <input type="text" id="bankBranch" name="bankBranch" required>
+          </div>
+          <div class="field">
+            <label for="bankAccount">Bank account number <span class="req">*</span></label>
+            <input type="text" id="bankAccount" name="bankAccount" required>
+          </div>
+          <div class="field">
+            <label for="bankIfsc">Bank IFSC <span class="req">*</span></label>
+            <input type="text" id="bankIfsc" name="bankIfsc" required style="text-transform:uppercase">
+          </div>
+          <div class="field">
+            <label for="loanAccount">Loan account number</label>
+            <input type="text" id="loanAccount" name="loanAccount">
+          </div>
+          <div class="field">
+            <label for="loanIfsc">Loan IFSC</label>
+            <input type="text" id="loanIfsc" name="loanIfsc" style="text-transform:uppercase">
+          </div>
+          <div class="field">
+            <label for="loanBankBranch">Loan bank &amp; branch</label>
+            <input type="text" id="loanBankBranch" name="loanBankBranch">
+          </div>
+          <div class="field">
+            <label for="passportNumber">Passport number</label>
+            <input type="text" id="passportNumber" name="passportNumber">
+          </div>
+          <div class="field">
+            <label for="aadhaarNumber">Aadhaar number <span class="req">*</span></label>
+            <input type="text" id="aadhaarNumber" name="aadhaarNumber" required pattern="[0-9]{12}" placeholder="12-digit number">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Achievements -->
+      <section class="panel" data-section="achievements" data-color="gold">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Section 11</p>
+          <h2>Achievements</h2>
+          <p class="panel__desc">Add every achievement worth recording. Use "Add another" for more than one.</p>
+        </div>
+        <div id="achievementsList" class="achievements"></div>
+        <button type="button" id="addAchievement" class="btn btn--ghost">+ Add another achievement</button>
+      </section>
+
+      <!-- Hostel Admission -->
+      <section class="panel" id="hostelPanel" data-section="hostel" data-color="slate" hidden>
+        <div class="panel__head">
+          <p class="panel__eyebrow">Hostel</p>
+          <h2>Hostel Admission</h2>
+          <p class="panel__desc">Provide your hostel details only if you have opted for hostel accommodation.</p>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label for="hostelName">Name of Applicant <span class="req">*</span></label>
+            <input type="text" id="hostelName" name="hostelName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field">
+            <label for="hostelCourse">Course / Branch <span class="req">*</span></label>
+            <input type="text" id="hostelCourse" name="hostelCourse" required>
+          </div>
+          <div class="field">
+            <label for="hostelParentName">Father / Mother Name <span class="req">*</span></label>
+            <input type="text" id="hostelParentName" name="hostelParentName" required>
+          </div>
+          <div class="field">
+            <label for="hostelDob">Date of Birth <span class="req">*</span></label>
+            <input type="date" id="hostelDob" name="hostelDob" required>
+          </div>
+          <div class="field">
+            <label for="hostelBloodGroup">Blood Group <span class="req">*</span></label>
+            <input type="text" id="hostelBloodGroup" name="hostelBloodGroup" required>
+          </div>
+          <div class="field">
+            <label for="hostelMedicineAllergy">Medicine Allergy <span class="req">*</span></label>
+            <select id="hostelMedicineAllergy" name="hostelMedicineAllergy" required>
+              <option value="" disabled selected>Select</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field field--wide">
+            <label for="hostelAllergyDetails">Allergy Details, if applicable</label>
+            <textarea id="hostelAllergyDetails" name="hostelAllergyDetails" rows="2"></textarea>
+          </div>
+          <div class="field">
+            <label for="hostelEmail">Email ID <span class="req">*</span></label>
+            <input type="email" id="hostelEmail" name="hostelEmail" required>
+          </div>
+          <div class="field">
+            <label for="hostelMobile">Mobile Number <span class="req">*</span></label>
+            <input type="tel" id="hostelMobile" name="hostelMobile" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field field--wide">
+            <label for="hostelAddress">Address of Correspondence <span class="req">*</span></label>
+            <textarea id="hostelAddress" name="hostelAddress" rows="2" required></textarea>
+          </div>
+          <div class="field">
+            <label for="hostelCorrespondencePhone">Correspondence Phone Number <span class="req">*</span></label>
+            <input type="tel" id="hostelCorrespondencePhone" name="hostelCorrespondencePhone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field field--wide">
+            <label for="hostelPermanentAddress">Permanent Address <span class="req">*</span></label>
+            <textarea id="hostelPermanentAddress" name="hostelPermanentAddress" rows="2" required></textarea>
+          </div>
+          <div class="field">
+            <label for="hostelPermanentPhone">Permanent Address Phone Number <span class="req">*</span></label>
+            <input type="tel" id="hostelPermanentPhone" name="hostelPermanentPhone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="hostelLocalGuardianName">Local Guardian Name <span class="req">*</span></label>
+            <input type="text" id="hostelLocalGuardianName" name="hostelLocalGuardianName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field field--wide">
+            <label for="hostelLocalGuardianAddress">Local Guardian Address <span class="req">*</span></label>
+            <textarea id="hostelLocalGuardianAddress" name="hostelLocalGuardianAddress" rows="2" required></textarea>
+          </div>
+          <div class="field">
+            <label for="hostelLocalGuardianPhone">Local Guardian Phone Number <span class="req">*</span></label>
+            <input type="tel" id="hostelLocalGuardianPhone" name="hostelLocalGuardianPhone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="hostelLocalGuardianOccupation">Local Guardian Occupation / Designation <span class="req">*</span></label>
+            <input type="text" id="hostelLocalGuardianOccupation" name="hostelLocalGuardianOccupation" required>
+          </div>
+          <div class="field">
+            <label for="hostelFatherOccupation">Father's Occupation / Designation <span class="req">*</span></label>
+            <input type="text" id="hostelFatherOccupation" name="hostelFatherOccupation" required>
+          </div>
+          <div class="field">
+            <label for="hostelMotherOccupation">Mother's Occupation / Designation <span class="req">*</span></label>
+            <input type="text" id="hostelMotherOccupation" name="hostelMotherOccupation" required>
+          </div>
+        </div>
+
+        <div class="panel__head">
+          <p class="panel__eyebrow">Relatives / Visitors</p>
+          <h3>Relatives / Visitors</h3>
+        </div>
+        <div id="hostelVisitorsList" class="achievements"></div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="hostelHolidayTravel">Whether he/she will travel alone or with parents / Local Guardian at the time of holidays <span class="req">*</span></label>
+            <select id="hostelHolidayTravel" name="hostelHolidayTravel" required>
+              <option value="" disabled selected>Select</option>
+              <option>Alone</option>
+              <option>With Parents</option>
+              <option>With Local Guardian</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="hostelEmergencyName">Emergency Contact Name <span class="req">*</span></label>
+            <input type="text" id="hostelEmergencyName" name="hostelEmergencyName" required pattern="[A-Za-z\s]+" title="Only alphabets are allowed">
+          </div>
+          <div class="field">
+            <label for="hostelEmergencyResidencePhone">Emergency Contact Residence Phone Number <span class="req">*</span></label>
+            <input type="tel" id="hostelEmergencyResidencePhone" name="hostelEmergencyResidencePhone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="hostelEmergencyOfficePhone">Emergency Contact Office Phone Number <span class="req">*</span></label>
+            <input type="tel" id="hostelEmergencyOfficePhone" name="hostelEmergencyOfficePhone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="hostelEmergencyRelation">Relationship with Student <span class="req">*</span></label>
+            <input type="text" id="hostelEmergencyRelation" name="hostelEmergencyRelation" required>
+          </div>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" id="hostelDeclaration" name="hostelDeclaration" required>
+          <span>I certify that the information provided above is true and correct to the best of my knowledge and agree to abide by the hostel rules and regulations.</span>
+        </label>
+      </section>
+
+      <!-- Review -->
+      <section class="panel panel--review" data-section="review" data-color="final">
+        <div class="panel__head">
+          <p class="panel__eyebrow">Final step</p>
+          <h2>Review &amp; submit</h2>
+          <p class="panel__desc">Please review all the information you have entered carefully before submitting your application. Once submitted, the application will be saved and cannot be edited from this form.</p>
+        </div>
+        <div class="review-instructions">
+          <p>Please review all the details carefully before submitting your application. Make sure that all the information provided is correct and complete.</p>
+          <p>After submission, your application will be saved to the database and a PDF copy will be generated automatically.</p>
+        </div>
+        <div id="reviewSummary" class="review-summary"></div>
+        <div class="review-actions">
+          <button type="button" id="backToEditBtn" class="btn btn--secondary">← Back &amp; Edit</button>
+          <button type="button" id="reviewSubmitBtn" class="btn btn--primary">Submit Application</button>
+        </div>
+        <label class="checkbox">
+          <input type="checkbox" id="confirmAccuracy" required>
+          <span>I confirm the information provided above is accurate to the best of my knowledge.</span>
+        </label>
+      </section>
+
+    </form>
+
+    <!-- Sticky nav controls -->
+    <div class="form-nav">
+      <button type="button" id="prevBtn" class="btn btn--secondary">Back</button>
+      <p class="form-nav__status" id="sectionStatus"></p>
+      <button type="button" id="nextBtn" class="btn btn--primary">Continue</button>
+      <button type="button" id="submitBtn" class="btn btn--primary" hidden>Submit application</button>
+    </div>
+  </main>
+</div>
+
+<!-- Success overlay -->
+<div class="overlay" id="successOverlay" hidden>
+  <div class="overlay__card">
+    <svg viewBox="0 0 52 52" width="52" height="52"><circle cx="26" cy="26" r="25" fill="none" stroke="var(--teal-700)" stroke-width="2"/><path fill="none" stroke="var(--teal-700)" stroke-width="3" d="M14 27l8 8 16-17"/></svg>
+    <h2>Application recorded</h2>
+    <p>Your admission application has been submitted successfully. Please keep a copy of the form if needed before admission confirmation.</p>
+    <button type="button" class="btn btn--primary" id="closeOverlay">Done</button>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
