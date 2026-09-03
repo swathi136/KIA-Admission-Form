@@ -66,20 +66,20 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
   align-items: center;
   justify-content: space-between;
   padding: 14px 28px;
-  background: var(--teal-900);
-  color: var(--wheat-50);
+  background: var(--wheat-50);
+  color: var(--ink-900);
   border-bottom: 3px solid var(--amber-600);
 }
 .topbar__brand { display: flex; align-items: center; gap: 12px; }
 .topbar__mark svg path { stroke: var(--sage-300) !important; }
-.topbar__title { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: 0.01em; }
-.topbar__subtitle { margin: 2px 0 0; font-size: 12.5px; color: var(--sage-300); }
+.topbar__title { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: 0.01em; color: var(--teal-900); }
+.topbar__subtitle { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-600); }
 .topbar__logo { height: 70px; width: auto; object-fit: contain; }
 .save-indicator {
   font-size: 12px;
-  color: var(--sage-300);
+  color: var(--teal-700);
   padding: 5px 10px;
-  border: 1px solid rgba(185,203,180,0.3);
+  border: 1px solid var(--sage-300);
   border-radius: 100px;
   transition: opacity .3s;
 }

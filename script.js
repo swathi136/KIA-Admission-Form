@@ -1324,7 +1324,7 @@
     doc.setFont("times", "italic");
     doc.setFontSize(10.5);
     doc.setTextColor(...PDF.soil);
-    doc.text("KUMARAGURU INSTITUTION OF AGRICULTURE", PDF.pageW / 2, y, { align: "center" });
+    doc.text("KUMARAGURU INSTITUTE OF AGRICULTURE", PDF.pageW / 2, y, { align: "center" });
     y += 8;
     doc.setFont("times", "bold");
     doc.setFontSize(21);
