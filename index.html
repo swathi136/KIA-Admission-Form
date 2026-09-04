@@ -52,6 +52,18 @@
           <h2>Identity</h2>
           <p class="panel__desc">Basic personal details as they should appear on official records.</p>
         </div>
+        <div class="photo-upload">
+          <div class="photo-upload__preview" id="photoPreviewBox">
+            <span class="photo-upload__placeholder" id="photoPlaceholder">No photo selected</span>
+            <img id="photoPreviewImg" hidden>
+          </div>
+          <div class="photo-upload__controls">
+            <label for="studentPhoto" class="btn btn--secondary">Choose Photo</label>
+            <input type="file" id="studentPhoto" name="studentPhoto" accept="image/png, image/jpeg" hidden>
+            <button type="button" id="removePhoto" class="photo-upload__remove" hidden>Remove photo</button>
+            <p class="photo-upload__hint">Passport-size photo, JPG or PNG, under 3MB. This photo will also be printed on the admission PDF.</p>
+          </div>
+        </div>
         <div class="grid">
           <div class="field">
             <label for="studentName">Student name <span class="req">*</span></label>
