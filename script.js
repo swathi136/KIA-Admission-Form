@@ -426,6 +426,99 @@
     });
   })();
 
+  /* ---------------- Student photo upload ---------------- */
+  const studentPhotoInput = document.getElementById("studentPhoto");
+  const photoPreviewImg = document.getElementById("photoPreviewImg");
+  const photoPlaceholder = document.getElementById("photoPlaceholder");
+  const removePhotoBtn = document.getElementById("removePhoto");
+  let studentPhotoDataUrl = "";
+
+  function compressImageToDataUrl(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read the selected file."));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Could not read that image."));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round(height * (maxDim / width));
+            width = maxDim;
+          } else if (height >= width && height > maxDim) {
+            width = Math.round(width * (maxDim / height));
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showPhotoPreview(dataUrl) {
+    if (photoPreviewImg) {
+      photoPreviewImg.src = dataUrl;
+      photoPreviewImg.hidden = false;
+    }
+    if (photoPlaceholder) photoPlaceholder.hidden = true;
+    if (removePhotoBtn) removePhotoBtn.hidden = false;
+  }
+
+  function clearPhotoPreview() {
+    if (photoPreviewImg) {
+      photoPreviewImg.hidden = true;
+      photoPreviewImg.src = "";
+    }
+    if (photoPlaceholder) photoPlaceholder.hidden = false;
+    if (removePhotoBtn) removePhotoBtn.hidden = true;
+  }
+
+  if (studentPhotoInput) {
+    studentPhotoInput.addEventListener("change", async () => {
+      const file = studentPhotoInput.files && studentPhotoInput.files[0];
+      if (!file) return;
+
+      if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+        alert("Please choose a JPG or PNG image.");
+        studentPhotoInput.value = "";
+        return;
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        alert("Please choose an image under 3MB.");
+        studentPhotoInput.value = "";
+        return;
+      }
+
+      try {
+        studentPhotoDataUrl = await compressImageToDataUrl(file, 600, 0.85);
+        showPhotoPreview(studentPhotoDataUrl);
+        saveDraft();
+      } catch (err) {
+        console.error("Photo processing failed.", err);
+        alert("Could not process that image. Please try another file.");
+        studentPhotoInput.value = "";
+      }
+    });
+  }
+
+  if (removePhotoBtn) {
+    removePhotoBtn.addEventListener("click", () => {
+      studentPhotoDataUrl = "";
+      if (studentPhotoInput) studentPhotoInput.value = "";
+      clearPhotoPreview();
+      saveDraft();
+    });
+  }
+
   /* ---------------- Draft autosave ---------------- */
   let saveTimer;
   function saveDraft() {
@@ -473,9 +566,15 @@
     Object.entries(data).forEach(([key, value]) => {
       const el = form.elements[key];
       if (!el) return;
+      if (el.type === "file") return;
       if (el.type === "checkbox") el.checked = !!value;
       else if (el.value !== undefined) el.value = value;
     });
+
+    if (data.studentPhoto) {
+      studentPhotoDataUrl = data.studentPhoto;
+      showPhotoPreview(studentPhotoDataUrl);
+    }
   }
 
   /* ---------------- Data collection ---------------- */
@@ -483,9 +582,11 @@
     const data = {};
     Array.from(form.elements).forEach((el) => {
       if (!el.name) return;
+      if (el.type === "file") return;
       if (el.type === "checkbox") data[el.name] = el.checked;
       else data[el.name] = el.value;
     });
+    data.studentPhoto = studentPhotoDataUrl || "";
     return data;
   }
 
@@ -977,6 +1078,52 @@
       y += 16;
     };
 
+    const addPhotoField = () => {
+      const boxW = 32;
+      const boxH = 38;
+      const boxX = pageW - margin - boxW;
+      ensureSpace(boxH + 8);
+      const boxY = y;
+
+      doc.setDrawColor(70, 70, 70);
+      doc.setLineWidth(0.3);
+      doc.rect(boxX, boxY, boxW, boxH);
+
+      if (data.studentPhoto) {
+        try {
+          doc.addImage(data.studentPhoto, "JPEG", boxX + 1, boxY + 1, boxW - 2, boxH - 2);
+        } catch (err) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(150, 150, 150);
+          doc.text("Photo unavailable", boxX + boxW / 2, boxY + boxH / 2, { align: "center" });
+        }
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        const lines = doc.splitTextToSize("Affix recent passport size photograph", boxW - 4);
+        const startY = boxY + boxH / 2 - ((lines.length - 1) * 3.4) / 2;
+        lines.forEach((line, idx) => doc.text(line, boxX + boxW / 2, startY + idx * 3.4, { align: "center" }));
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(30, 30, 30);
+      doc.text("Passport Size Photograph", margin, boxY + 6);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(90, 90, 90);
+      const noteLines = doc.splitTextToSize(
+        "A copy of the uploaded photograph is printed alongside the student's official record.",
+        contentW - boxW - 14
+      );
+      noteLines.forEach((line, idx) => doc.text(line, margin, boxY + 12 + idx * 4.2));
+
+      y = boxY + boxH + 8;
+    };
+
     const addHeader = () => {
       doc.setFillColor(245, 245, 240);
       doc.rect(0, 0, pageW, 18, "F");
@@ -1025,6 +1172,7 @@
     };
 
     addHeader();
+    addPhotoField();
     addPartHeader("PART A — COLLEGE ADMISSION FORM");
 
     drawKeyValueTable("1. STUDENT & ADMISSION DETAILS", [
@@ -1324,7 +1472,7 @@
     doc.setFont("times", "italic");
     doc.setFontSize(10.5);
     doc.setTextColor(...PDF.soil);
-    doc.text("KUMARAGURU INSTITUTION OF AGRICULTURE", PDF.pageW / 2, y, { align: "center" });
+    doc.text("KUMARAGURU INSTITUTE OF AGRICULTURE", PDF.pageW / 2, y, { align: "center" });
     y += 8;
     doc.setFont("times", "bold");
     doc.setFontSize(21);
