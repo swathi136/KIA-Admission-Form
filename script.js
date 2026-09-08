@@ -755,9 +755,14 @@
       throw new Error("Supabase is not available. Check supabase-client.js and refresh the page.");
     }
 
+    // The compressed photo is retained locally for the PDF; it is uploaded to
+    // Storage separately and must not be placed in the database RPC payload.
+    const databaseData = { ...formData };
+    delete databaseData.studentPhoto;
+
     const { data, error } = await supabaseClient.rpc("submit_admission", {
-      p_form: formData,
-      p_achievements: buildAchievementsPayload(formData)
+      p_form: databaseData,
+      p_achievements: buildAchievementsPayload(databaseData)
     });
 
     if (error) throw error;
@@ -765,6 +770,31 @@
       throw new Error("Supabase did not return a registration number.");
     }
     return data[0];
+  }
+
+  async function uploadStudentPhoto(identityId) {
+    if (!studentPhotoDataUrl) return "";
+
+    const response = await fetch(studentPhotoDataUrl);
+    const photoBlob = await response.blob();
+    const photoPath = `${identityId}/passport-photo.jpg`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from("student-photos")
+      .upload(photoPath, photoBlob, {
+        cacheControl: "31536000",
+        contentType: "image/jpeg",
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { error: savePathError } = await supabaseClient.rpc("set_identity_photo_path", {
+      p_identity_id: identityId,
+      p_photo_path: photoPath
+    });
+    if (savePathError) throw savePathError;
+
+    return photoPath;
   }
 
   function buildSubmissionFilename(data) {
@@ -835,14 +865,14 @@
     try {
       const submittedAt = new Date().toISOString();
       const submission = await saveApplicationToSupabase(data);
+      submissionStatus = "database-saved";
+      await uploadStudentPhoto(submission.identity_id);
       const savedData = {
         ...data,
         submittedAt,
         registerNumber: submission.registration_number,
         rollNumber: ""
       };
-
-      submissionStatus = "database-saved";
 
       const pdfOutput = buildOfficialAdmissionPdf({ ...savedData }, {
         returnBlob: true,
@@ -878,8 +908,8 @@
       }
 
       console.error("Submission failed.", error);
-      const message = error && error.message && error.message.toLowerCase().includes("pdf")
-        ? "Your application was submitted successfully, but the PDF could not be generated. Please try again."
+      const message = submissionStatus === "database-saved"
+        ? "Your application was saved, but the photo or PDF could not be completed. Please contact the administrator before submitting again."
         : "Unable to submit your application. Please try again.";
       showSubmissionStatus(message, true);
       controls.forEach((button) => {
