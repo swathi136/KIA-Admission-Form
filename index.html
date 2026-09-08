@@ -25,7 +25,51 @@
   </div>
 </header>
 
-<div class="layout">
+<main class="entry-shell" id="landingView">
+  <section class="entry-card" id="entryChoiceView">
+    <p class="panel__eyebrow">KIA admissions</p>
+    <h1>Choose your entry</h1>
+    <p class="entry-card__desc">Select the workspace you need to continue.</p>
+    <div class="entry-options">
+      <button type="button" class="entry-option" id="studentEntryBtn">
+        <strong>Student Entry</strong>
+        <span>Complete and submit a new admission form.</span>
+      </button>
+      <button type="button" class="entry-option" id="staffEntryBtn">
+        <strong>Staff Entry</strong>
+        <span>Review submitted student applications.</span>
+      </button>
+    </div>
+  </section>
+  <section class="entry-card" id="staffGateView" hidden>
+    <p class="panel__eyebrow">Staff workspace</p>
+    <h1>Staff Entry</h1>
+    <p class="entry-card__desc">Enter your institutional email address to continue.</p>
+    <form id="staffGateForm" class="staff-gate-form">
+      <label for="staffEmail">KIA email address</label>
+      <input type="email" id="staffEmail" autocomplete="email" placeholder="name@kia.ac.in" required>
+      <p class="field__error" id="staffGateError" role="alert"></p>
+      <div class="entry-actions">
+        <button type="button" class="btn btn--secondary" id="staffBackBtn">Back</button>
+        <button type="submit" class="btn btn--primary">Open Staff Dashboard</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div class="staff-review-bar" id="staffReviewBar" hidden>
+  <div>
+    <strong>Please verify all student details before approval.</strong>
+    <span id="staffReviewIdentity"></span>
+  </div>
+  <div class="staff-review-bar__actions">
+    <button type="button" class="btn btn--secondary" id="staffReviewBackBtn">Back to Dashboard</button>
+    <button type="button" class="btn btn--secondary" id="staffSaveBtn">Save Changes</button>
+    <button type="button" class="btn btn--primary" id="staffApproveBtn">Approve Application</button>
+  </div>
+</div>
+
+<div class="layout" id="studentFormView" hidden>
 
   <!-- ===================== SIDEBAR / STEP RAIL ===================== -->
   <nav class="rail" id="rail" aria-label="Form sections">
@@ -722,6 +766,7 @@
 
     <!-- Sticky nav controls -->
     <div class="form-nav">
+      <button type="button" id="staffFormBackBtn" class="btn btn--secondary" hidden>Back to Dashboard</button>
       <button type="button" id="prevBtn" class="btn btn--secondary">Back</button>
       <p class="form-nav__status" id="sectionStatus"></p>
       <button type="button" id="nextBtn" class="btn btn--primary">Continue</button>
@@ -729,6 +774,37 @@
     </div>
   </main>
 </div>
+
+<main class="dashboard-shell" id="staffDashboardView" hidden>
+  <div class="dashboard-head">
+    <div>
+      <p class="panel__eyebrow">Staff workspace</p>
+      <h1>Application Dashboard</h1>
+      <p class="dashboard-head__desc">Review pending applications before they become official records.</p>
+    </div>
+    <div class="dashboard-head__actions">
+      <button type="button" class="btn btn--secondary" id="dashboardHomeBtn">Landing</button>
+      <button type="button" class="btn btn--primary" id="newStudentBtn">+ New Student</button>
+    </div>
+  </div>
+  <div class="dashboard-toolbar">
+    <div class="dashboard-tabs" role="tablist" aria-label="Application status">
+      <button type="button" class="dashboard-tab is-active" data-status="Pending Review">Pending Review</button>
+      <button type="button" class="dashboard-tab" data-status="Approved">Approved</button>
+    </div>
+    <label class="dashboard-search" for="applicationSearch">
+      <span>Search applications</span>
+      <input type="search" id="applicationSearch" placeholder="Name, ID, mobile or email">
+    </label>
+  </div>
+  <div class="dashboard-table-wrap">
+    <table class="dashboard-table">
+      <thead><tr><th>Student Name</th><th>Application ID</th><th>Course</th><th>Admission Type</th><th>Mobile</th><th>Email</th><th>Status</th><th>Submitted Date</th><th>Action</th></tr></thead>
+      <tbody id="applicationsTableBody"></tbody>
+    </table>
+    <p class="dashboard-empty" id="dashboardEmpty">No applications found.</p>
+  </div>
+</main>
 
 <!-- Success overlay -->
 <div class="overlay" id="successOverlay" hidden>

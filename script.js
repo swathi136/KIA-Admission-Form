@@ -4,12 +4,13 @@
    - Validates each section before letting the student continue
    - Autosaves every field to localStorage as a draft
    - Repeatable "Achievement" cards
-   - On submit: saves related records through Supabase, then downloads a PDF.
+  - On submit: stores a pending application, then downloads a PDF.
    ============================================================ */
 (function () {
   "use strict";
 
   const DRAFT_KEY = "kia_admission_draft_v1";
+  const PENDING_APPLICATIONS_KEY = "kia_pending_admission_applications_v1";
 
   const form = document.getElementById("admissionForm");
   const allPanels = Array.from(form.querySelectorAll(".panel"));
@@ -29,6 +30,23 @@
   const successOverlay = document.getElementById("successOverlay");
   const backToEditBtn = document.getElementById("backToEditBtn");
   const reviewSubmitBtn = document.getElementById("reviewSubmitBtn");
+  const landingView = document.getElementById("landingView");
+  const entryChoiceView = document.getElementById("entryChoiceView");
+  const staffGateView = document.getElementById("staffGateView");
+  const staffGateForm = document.getElementById("staffGateForm");
+  const staffEmailInput = document.getElementById("staffEmail");
+  const staffGateError = document.getElementById("staffGateError");
+  const studentFormView = document.getElementById("studentFormView");
+  const staffDashboardView = document.getElementById("staffDashboardView");
+  const staffReviewBar = document.getElementById("staffReviewBar");
+  const staffFormBackBtn = document.getElementById("staffFormBackBtn");
+  const staffReviewIdentity = document.getElementById("staffReviewIdentity");
+  const applicationsTableBody = document.getElementById("applicationsTableBody");
+  const dashboardEmpty = document.getElementById("dashboardEmpty");
+  const applicationSearch = document.getElementById("applicationSearch");
+  let appMode = "student";
+  let currentStaffApplicationId = "";
+  let dashboardStatus = "Pending Review";
 
   const SECTION_LABELS = {
     identity: "Identity",
@@ -773,6 +791,105 @@
     return regNumber ? `KIA_Admission_Form_${safeStudentName}_${regNumber}.pdf` : `KIA_Admission_Form_${safeStudentName}.pdf`;
   }
 
+  function readPendingApplications() {
+    try {
+      const raw = localStorage.getItem(PENDING_APPLICATIONS_KEY);
+      const applications = raw ? JSON.parse(raw) : [];
+      return Array.isArray(applications) ? applications : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writePendingApplications(applications) {
+    localStorage.setItem(PENDING_APPLICATIONS_KEY, JSON.stringify(applications));
+  }
+
+  function createPendingApplication(data) {
+    const id = `APP-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+    const application = {
+      applicationId: id,
+      status: "Pending Review",
+      submittedAt: new Date().toISOString(),
+      data: { ...data, applicationId: id, registerNumber: data.registerNumber || "", rollNumber: data.rollNumber || "" }
+    };
+    writePendingApplications([...readPendingApplications(), application]);
+    return application;
+  }
+
+  function updatePendingApplication(application) {
+    const applications = readPendingApplications();
+    const index = applications.findIndex((item) => item.applicationId === application.applicationId);
+    if (index === -1) return;
+    applications[index] = application;
+    writePendingApplications(applications);
+  }
+
+  function resetDynamicFields() {
+    Array.from(achievementsList.children).forEach((card) => card.remove());
+    achievementCount = 0;
+    addAchievement();
+    Array.from(hostelVisitorsList.children).forEach((card) => card.remove());
+    for (let i = 0; i < 3; i += 1) addHostelVisitor();
+  }
+
+  function resetAdmissionForm() {
+    form.reset();
+    resetDynamicFields();
+    studentPhotoDataUrl = "";
+    clearPhotoPreview();
+    try { localStorage.removeItem(DRAFT_KEY); } catch (error) {}
+    form.querySelectorAll(".has-error").forEach((field) => field.classList.remove("has-error"));
+    form.querySelectorAll(".field__error").forEach((error) => error.remove());
+    reviewSummary.innerHTML = "";
+    hostelPrefillState.initialized = false;
+    currentStaffApplicationId = "";
+    currentIndex = 0;
+    syncHostelStep();
+    renderRail();
+    goTo(0);
+  }
+
+  function restoreApplicationToForm(data) {
+    resetAdmissionForm();
+    const achievementNumbers = Object.keys(data)
+      .map((key) => key.match(/^achActivity_(\d+)$/))
+      .filter(Boolean)
+      .map((match) => Number(match[1]));
+    const achievementTotal = Math.max(0, ...achievementNumbers);
+    Array.from(achievementsList.children).forEach((card) => card.remove());
+    achievementCount = 0;
+    for (let index = 1; index <= achievementTotal; index += 1) {
+      addAchievement({
+        achCategory: data[`achCategory_${index}`] || "",
+        achActivity: data[`achActivity_${index}`] || "",
+        achLevel: data[`achLevel_${index}`] || "",
+        achType: data[`achType_${index}`] || "",
+        achDescription: data[`achDescription_${index}`] || ""
+      });
+    }
+    if (!achievementTotal) addAchievement();
+
+    Object.entries(data).forEach(([key, value]) => {
+      const element = form.elements[key];
+      if (!element || element.type === "file") return;
+      if (element.type === "checkbox") element.checked = !!value;
+      else element.value = value == null ? "" : value;
+    });
+    if (data.studentPhoto) {
+      studentPhotoDataUrl = data.studentPhoto;
+      showPhotoPreview(studentPhotoDataUrl);
+    }
+    const bloodGroupOtherField = document.getElementById("bloodGroupOtherField");
+    const communityOtherField = document.getElementById("communityOtherField");
+    if (bloodGroupOtherField) bloodGroupOtherField.style.display = data.bloodGroup === "Other" ? "block" : "none";
+    if (communityOtherField) communityOtherField.style.display = data.community === "Other" ? "block" : "none";
+    hostelPrefillState.initialized = true;
+    syncHostelStep();
+    renderRail();
+    goTo(0);
+  }
+
   function showSubmissionStatus(message, isError) {
     const status = document.getElementById("saveIndicator");
     if (status) {
@@ -781,6 +898,104 @@
     }
     if (isError) {
       alert(message);
+    }
+  }
+
+  function showStudentForm() {
+    appMode = "student";
+    landingView.hidden = true;
+    staffDashboardView.hidden = true;
+    staffReviewBar.hidden = true;
+    staffFormBackBtn.hidden = true;
+    studentFormView.hidden = false;
+    document.body.classList.remove("staff-review-mode");
+  }
+
+  function showLanding() {
+    appMode = "student";
+    landingView.hidden = false;
+    entryChoiceView.hidden = false;
+    staffGateView.hidden = true;
+    studentFormView.hidden = true;
+    staffDashboardView.hidden = true;
+    staffReviewBar.hidden = true;
+    staffFormBackBtn.hidden = true;
+    document.body.classList.remove("staff-review-mode");
+  }
+
+  function showStaffDashboard() {
+    appMode = "staff";
+    landingView.hidden = true;
+    studentFormView.hidden = true;
+    staffReviewBar.hidden = true;
+    staffFormBackBtn.hidden = true;
+    staffDashboardView.hidden = false;
+    document.body.classList.remove("staff-review-mode");
+    renderDashboard();
+  }
+
+  function applicationMatches(application, query) {
+    if (!query) return true;
+    const data = application.data || {};
+    return [application.applicationId, data.registerNumber, data.studentName, data.studentMobile, data.email]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+  }
+
+  function renderDashboard() {
+    const query = String(applicationSearch.value || "").trim().toLowerCase();
+    const applications = readPendingApplications()
+      .filter((application) => application.status === dashboardStatus)
+      .filter((application) => applicationMatches(application, query));
+    applicationsTableBody.innerHTML = "";
+    dashboardEmpty.classList.toggle("is-visible", applications.length === 0);
+    applications.forEach((application) => {
+      const data = application.data || {};
+      const row = document.createElement("tr");
+      const statusClass = application.status === "Approved" ? " status-badge--approved" : "";
+      row.innerHTML = `
+        <td>${escapeHtml(data.studentName || "")}</td>
+        <td>${escapeHtml(data.registerNumber || application.applicationId)}</td>
+        <td>${escapeHtml(data.course || "")}</td>
+        <td>${escapeHtml(data.admissionType || "")}</td>
+        <td>${escapeHtml(data.studentMobile || "")}</td>
+        <td>${escapeHtml(data.email || "")}</td>
+        <td><span class="status-badge${statusClass}">${escapeHtml(application.status)}</span></td>
+        <td>${escapeHtml(new Date(application.submittedAt).toLocaleString())}</td>
+        <td><button type="button" class="btn btn--secondary dashboard-open-btn" data-application-id="${escapeHtml(application.applicationId)}">Open</button></td>`;
+      applicationsTableBody.appendChild(row);
+    });
+  }
+
+  function openStaffApplication(applicationId) {
+    const application = readPendingApplications().find((item) => item.applicationId === applicationId);
+    if (!application) return;
+    restoreApplicationToForm(application.data || {});
+    currentStaffApplicationId = applicationId;
+    appMode = "staff";
+    staffDashboardView.hidden = true;
+    landingView.hidden = true;
+    studentFormView.hidden = false;
+    staffReviewBar.hidden = false;
+    staffFormBackBtn.hidden = false;
+    staffReviewIdentity.textContent = `${application.data.studentName || "Student"} · ${application.data.registerNumber || application.applicationId}`;
+    document.body.classList.add("staff-review-mode");
+    sectionStatus.textContent = "Staff review";
+  }
+
+  function saveStaffApplication(approve) {
+    const application = readPendingApplications().find((item) => item.applicationId === currentStaffApplicationId);
+    if (!application) return;
+    application.data = collectData();
+    application.data.applicationId = application.applicationId;
+    if (approve) application.status = "Approved";
+    updatePendingApplication(application);
+    if (approve) {
+      dashboardStatus = "Approved";
+      document.querySelectorAll(".dashboard-tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.status === dashboardStatus));
+      showStaffDashboard();
+    } else {
+      staffReviewIdentity.textContent = `${application.data.studentName || "Student"} · ${application.data.registerNumber || application.applicationId}`;
+      showSubmissionStatus("Changes saved", false);
     }
   }
 
@@ -833,16 +1048,15 @@
     let submissionStatus = "pending";
 
     try {
-      const submittedAt = new Date().toISOString();
-      const submission = await saveApplicationToSupabase(data);
+      const pendingApplication = createPendingApplication(data);
       const savedData = {
         ...data,
-        submittedAt,
-        registerNumber: submission.registration_number,
+        submittedAt: pendingApplication.submittedAt,
+        registerNumber: data.registerNumber || "",
         rollNumber: ""
       };
 
-      submissionStatus = "database-saved";
+      submissionStatus = "pending-review";
 
       const pdfOutput = buildOfficialAdmissionPdf({ ...savedData }, {
         returnBlob: true,
@@ -867,7 +1081,7 @@
         const previewNote = previewResult.previewOpened
           ? " Your PDF has been downloaded and opened for preview."
           : " Your PDF has been downloaded successfully. If the preview did not open automatically, you can open the downloaded PDF manually.";
-        overlayText.innerHTML = `Your application has been saved successfully.${previewNote}<br><strong>Registration ID: ${savedData.registerNumber}</strong>${savedData.rollNumber ? `<br><strong>Roll Number: ${savedData.rollNumber}</strong>` : ""}<br>Please keep the downloaded PDF for your records.`;
+        overlayText.innerHTML = `Your application is pending staff review.${previewNote}<br><strong>Application ID: ${pendingApplication.applicationId}</strong><br>Please keep the downloaded PDF for your records.`;
       }
 
       successOverlay.hidden = false;
@@ -940,6 +1154,22 @@
       return doc.splitTextToSize(text || "", width);
     };
 
+    const valueLayout = (value, width, maxHeight = pageH - 36) => {
+      const text = value === null || value === undefined || String(value).trim() === "" ? "" : String(value);
+      let fontSize = 8;
+      let lines = [];
+      let lineHeight = 4.2;
+      do {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(fontSize);
+        lines = text ? doc.splitTextToSize(String(text), width) : [""];
+        lineHeight = fontSize <= 6.5 ? 3.4 : 4.2;
+        if (8 + lines.length * lineHeight <= maxHeight || fontSize <= 5.5) break;
+        fontSize -= 0.5;
+      } while (fontSize >= 5.5);
+      return { lines, fontSize, lineHeight };
+    };
+
     const drawKeyValueTable = (title, rows) => {
       if (!rows || !rows.length) return;
       sectionHeading(title);
@@ -950,7 +1180,6 @@
         pairGroups.push(rows.slice(i, i + 2));
       }
 
-      let currentY = y;
       pairGroups.forEach((group) => {
         const fieldCount = group.length;
         const cellW = tableW / fieldCount;
@@ -958,10 +1187,11 @@
         const cellValueW = cellW - cellLabelW;
         const groupHeight = Math.max(12, ...group.map(([label, value]) => {
           const labelLines = splitValue(label, cellLabelW - 4);
-          const valueLines = splitValue(value, cellValueW - 6);
-          return Math.max(labelLines.length, valueLines.length) * 4.5 + 8;
+          const valueLines = valueLayout(value, cellValueW - 6).lines;
+          return Math.max(labelLines.length * 4.2, valueLines.length * 4.2) + 8;
         }));
         ensureSpace(groupHeight + 2);
+        const currentY = y;
         doc.setDrawColor(70, 70, 70);
         doc.setLineWidth(0.2);
         group.forEach(([,], fieldIndex) => {
@@ -973,7 +1203,7 @@
         group.forEach(([label, value], fieldIndex) => {
           const x = left + (fieldIndex * cellW);
           const labelLines = splitValue(label, cellLabelW - 4);
-          const valueLines = splitValue(value, cellValueW - 6).length ? splitValue(value, cellValueW - 6) : [""];
+          const valueLayoutResult = valueLayout(value, cellValueW - 6, groupHeight - 8);
           doc.setTextColor(40, 40, 40);
           doc.setFont("helvetica", "bold");
           doc.setFontSize(7.8);
@@ -981,14 +1211,14 @@
             doc.text(line, x + 3, currentY + 5 + idx * 4.2);
           });
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(8.0);
-          valueLines.forEach((line, idx) => {
-            doc.text(line || "", x + cellLabelW + 4, currentY + 5 + idx * 4.2);
+          doc.setFontSize(valueLayoutResult.fontSize);
+          valueLayoutResult.lines.forEach((line, idx) => {
+            doc.text(line || "", x + cellLabelW + 4, currentY + 5 + idx * valueLayoutResult.lineHeight);
           });
         });
-        currentY += groupHeight;
+        y = currentY + groupHeight;
       });
-      y = currentY + 4;
+      y += 4;
     };
 
     const drawBlockTable = (title, rows, cols) => {
@@ -997,55 +1227,59 @@
       const left = margin;
       const tableW = contentW;
       const totalColWidth = cols.reduce((sum, col) => sum + col.width, 0);
-      const maxCellHeight = (row) => row.reduce((max, item, index) => {
-        const width = cols[index]?.width || 20;
-        const lines = splitValue(item, width - 6);
-        return Math.max(max, lines.length * 4.2 + 6);
-      }, 12);
-      const rowHeights = rows.map((row) => maxCellHeight(row));
-      const tableHeight = rowHeights.reduce((sum, h) => sum + h, 0) + 8;
-      ensureSpace(tableHeight + 8);
+      const widthScale = tableW / totalColWidth;
+      const columnWidths = cols.map((col) => col.width * widthScale);
+      const drawTableHeader = () => {
+        ensureSpace(10);
+        const headerY = y;
+        doc.setDrawColor(70, 70, 70);
+        doc.setLineWidth(0.2);
+        doc.setFillColor(238, 240, 233);
+        doc.rect(left, headerY, tableW, 8, "F");
+        doc.setTextColor(30, 30, 30);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.8);
+        let headerX = left;
+        cols.forEach((col, idx) => {
+          doc.text((col.title || "").toUpperCase(), headerX + 3, headerY + 5.5);
+          if (idx < cols.length - 1) doc.line(headerX + columnWidths[idx], headerY, headerX + columnWidths[idx], headerY + 8);
+          headerX += columnWidths[idx];
+        });
+        doc.rect(left, headerY, tableW, 8);
+        y = headerY + 8;
+      };
+
+      drawTableHeader();
       doc.setDrawColor(70, 70, 70);
       doc.setLineWidth(0.2);
-      doc.rect(left, y, tableW, tableHeight);
-      doc.setFillColor(238, 240, 233);
-      doc.rect(left, y, tableW, 8, "F");
-      doc.setTextColor(30, 30, 30);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.8);
-      let currentX = left;
-      cols.forEach((col, idx) => {
-        doc.text((col.title || "").toUpperCase(), currentX + 3, y + 5.5);
-        if (idx < cols.length - 1) {
-          doc.line(currentX + col.width, y, currentX + col.width, y + tableHeight);
-        }
-        currentX += col.width;
-      });
-      let cursorY = y + 8;
-      rows.forEach((row, rowIndex) => {
-        const rowH = rowHeights[rowIndex];
+      rows.slice(1).forEach((row) => {
+        const rowLayouts = row.map((item, index) => valueLayout(item, columnWidths[index] - 6));
+        const rowH = Math.max(12, ...rowLayouts.map((layout) => 6 + layout.lines.length * layout.lineHeight));
+        const pageBefore = doc.internal.getNumberOfPages();
+        ensureSpace(rowH + 2);
+        if (doc.internal.getNumberOfPages() !== pageBefore) drawTableHeader();
+        const cursorY = y;
         let cellX = left;
         row.forEach((cell, index) => {
-          const colWidth = cols[index].width;
+          const colWidth = columnWidths[index];
           doc.rect(cellX, cursorY, colWidth, rowH);
-          const lines = splitValue(cell, colWidth - 6).length ? splitValue(cell, colWidth - 6) : [""];
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(7.6);
-          lines.forEach((line, lineIdx) => {
-            doc.text(String(line || ""), cellX + 3, cursorY + 5 + lineIdx * 4.2);
+          doc.setFontSize(rowLayouts[index].fontSize);
+          rowLayouts[index].lines.forEach((line, lineIdx) => {
+            doc.text(String(line || ""), cellX + 3, cursorY + 5 + lineIdx * rowLayouts[index].lineHeight);
           });
           cellX += colWidth;
         });
-        cursorY += rowH;
+        y = cursorY + rowH;
       });
-      y = cursorY + 4;
+      y += 4;
     };
 
     const addDeclaration = (title, declarationText) => {
       sectionHeading(title, [67, 78, 73]);
-      const boxY = y;
       const boxH = 34;
       ensureSpace(boxH + 4);
+      const boxY = y;
       doc.setDrawColor(70, 70, 70);
       doc.setLineWidth(0.2);
       doc.rect(margin, boxY, contentW, boxH);
@@ -1073,8 +1307,8 @@
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
-      doc.text("Room Allocated:", margin + 4, y + 7);
-      doc.line(margin + 42, y + 8, pageW - margin - 8, y + 8);
+      doc.text("Room Allocated (For Office Use):", margin + 4, y + 7);
+      doc.line(margin + 78, y + 8, pageW - margin - 8, y + 8);
       y += 16;
     };
 
@@ -1241,8 +1475,8 @@
       ["Total", data.mTotal || ""],
       ["Cut-off Scored in XII Standard", data.xiiCutoff || ""],
       ["EMIS Number", data.emisNumber || ""]
-    ].filter(([, value]) => String(value).trim() !== "");
-    if (subjectRows.length) drawKeyValueTable("5. XII STANDARD SUBJECT-WISE MARKS", subjectRows);
+    ];
+    drawKeyValueTable("5. XII STANDARD SUBJECT-WISE MARKS", subjectRows);
 
     drawKeyValueTable("6. FAMILY PROFILE", [
       ["Father / Guardian Name", data.fatherName || ""],
@@ -1609,6 +1843,50 @@
     }
     return true;
   }
+
+  document.getElementById("studentEntryBtn").addEventListener("click", () => {
+    showStudentForm();
+  });
+
+  document.getElementById("staffEntryBtn").addEventListener("click", () => {
+    entryChoiceView.hidden = true;
+    staffGateView.hidden = false;
+    staffEmailInput.focus();
+  });
+
+  document.getElementById("staffBackBtn").addEventListener("click", showLanding);
+  staffGateForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = staffEmailInput.value.trim();
+    if (!/@kia\.ac\.in$/i.test(email)) {
+      staffGateError.textContent = "Please enter a valid institutional email ending with @kia.ac.in.";
+      staffEmailInput.focus();
+      return;
+    }
+    staffGateError.textContent = "";
+    showStaffDashboard();
+  });
+  applicationSearch.addEventListener("input", renderDashboard);
+  document.querySelectorAll(".dashboard-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      dashboardStatus = tab.dataset.status;
+      document.querySelectorAll(".dashboard-tab").forEach((item) => item.classList.toggle("is-active", item === tab));
+      renderDashboard();
+    });
+  });
+  applicationsTableBody.addEventListener("click", (event) => {
+    const button = event.target.closest(".dashboard-open-btn");
+    if (button) openStaffApplication(button.dataset.applicationId);
+  });
+  document.getElementById("dashboardHomeBtn").addEventListener("click", showLanding);
+  document.getElementById("newStudentBtn").addEventListener("click", () => {
+    resetAdmissionForm();
+    showStudentForm();
+  });
+  document.getElementById("staffReviewBackBtn").addEventListener("click", showStaffDashboard);
+  staffFormBackBtn.addEventListener("click", showStaffDashboard);
+  document.getElementById("staffSaveBtn").addEventListener("click", () => saveStaffApplication(false));
+  document.getElementById("staffApproveBtn").addEventListener("click", () => saveStaffApplication(true));
 
   /* ---------------- Init ---------------- */
   addAchievement(); // start with one empty achievement card
