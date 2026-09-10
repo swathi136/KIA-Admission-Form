@@ -657,7 +657,7 @@
 
   function buildSubmissionFilename(data) {
     const safeStudentName = (data.studentName || "student").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() || "student";
-    const recordNumber = (data.registerNumber || data.applicationId || "").trim();
+    const recordNumber = (data.registerNumber || "").trim();
     return recordNumber ? `KIA_Admission_Form_${safeStudentName}_${recordNumber}.pdf` : `KIA_Admission_Form_${safeStudentName}.pdf`;
   }
 
