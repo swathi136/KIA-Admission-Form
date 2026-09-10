@@ -643,14 +643,14 @@
       throw new Error("Supabase is not available. Check supabase-client.js and refresh the page.");
     }
 
-    const { data, error } = await supabaseClient.rpc("submit_pending_admission", {
+    const { data, error } = await supabaseClient.rpc("submit_pending_admission_with_registration", {
       p_form: formData,
       p_achievements: buildAchievementsPayload(formData)
     });
 
     if (error) throw error;
-    if (!Array.isArray(data) || !data[0]?.application_id) {
-      throw new Error("Supabase did not return a pending application ID.");
+    if (!Array.isArray(data) || !data[0]?.application_id || !data[0]?.registration_number) {
+      throw new Error("Supabase did not return the application and registration numbers.");
     }
     return data[0];
   }
@@ -962,6 +962,7 @@
       const pendingSubmission = await savePendingApplicationToSupabase(data);
       const pendingApplication = {
         applicationId: pendingSubmission.application_id,
+        registrationNumber: pendingSubmission.registration_number,
         submittedAt: pendingSubmission.submitted_at,
         data
       };
@@ -969,7 +970,7 @@
         ...data,
         applicationId: pendingApplication.applicationId,
         submittedAt: pendingApplication.submittedAt,
-        registerNumber: "",
+        registerNumber: pendingApplication.registrationNumber,
         rollNumber: ""
       };
       resetAdmissionForm();
@@ -978,14 +979,17 @@
       const overlayText = document.querySelector("#successOverlay p");
       if (overlayTitle) overlayTitle.textContent = "Application submitted successfully.";
       if (overlayText) {
-        overlayText.innerHTML = `Your application has been sent for staff review.<br><strong>Application ID: ${pendingApplication.applicationId}</strong><br>A PDF will be generated only after staff approval.`;
+        overlayText.innerHTML = `Your application has been sent for staff review.<br><strong>Registration Number: ${pendingApplication.registrationNumber}</strong><br>A PDF will be generated only after staff approval.`;
       }
 
       successOverlay.hidden = false;
       showSubmissionStatus("Application sent for staff review", false);
     } catch (error) {
       console.error("Submission failed.", error);
-      showSubmissionStatus("Unable to submit your application for staff review. Please try again.", true);
+      const detail = String(error?.message || error?.details || "").trim();
+      showSubmissionStatus(detail
+        ? `Unable to submit application: ${detail}`
+        : "Unable to submit your application for staff review. Please try again.", true);
       controls.forEach((button) => {
         button.disabled = false;
         button.textContent = button.id === "reviewSubmitBtn" ? "Submit Application" : "Submit application";
@@ -1247,10 +1251,10 @@
       doc.rect(rightBoxX + 35, boxY, boxW - 35, boxH);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
-      doc.text(data.registerNumber ? "Registration No." : "Application ID", leftBoxX + 4, boxY + 8);
+      doc.text("Registration No.", leftBoxX + 4, boxY + 8);
       doc.text("Roll No.", rightBoxX + 4, boxY + 8);
 
-      const regVal = data.registerNumber || data.applicationId || "";
+      const regVal = data.registerNumber || "";
       const rollVal = data.rollNumber || "";
       if (regVal) {
         doc.setFont("helvetica", "normal");
