@@ -2,15 +2,12 @@
    KIA Admission Data Form — behaviour
    - Builds the step rail from the panels found in the DOM
    - Validates each section before letting the student continue
-   - Autosaves every field to localStorage as a draft
+   - Keeps form values in memory until submission to Supabase
    - Repeatable "Achievement" cards
   - On submit: stores a pending application, then downloads a PDF.
    ============================================================ */
 (function () {
   "use strict";
-
-  const DRAFT_KEY = "kia_admission_draft_v1";
-  const PENDING_APPLICATIONS_KEY = "kia_pending_admission_applications_v1";
 
   const form = document.getElementById("admissionForm");
   const allPanels = Array.from(form.querySelectorAll(".panel"));
@@ -28,6 +25,7 @@
   const saveIndicator = document.getElementById("saveIndicator");
   const reviewSummary = document.getElementById("reviewSummary");
   const successOverlay = document.getElementById("successOverlay");
+  const downloadSubmittedPdfBtn = document.getElementById("downloadSubmittedPdf");
   const backToEditBtn = document.getElementById("backToEditBtn");
   const reviewSubmitBtn = document.getElementById("reviewSubmitBtn");
   const landingView = document.getElementById("landingView");
@@ -35,6 +33,12 @@
   const staffGateView = document.getElementById("staffGateView");
   const staffGateForm = document.getElementById("staffGateForm");
   const staffEmailInput = document.getElementById("staffEmail");
+  const staffPasswordInput = document.getElementById("staffPassword");
+  const staffConfirmPasswordInput = document.getElementById("staffConfirmPassword");
+  const staffConfirmPasswordGroup = document.getElementById("staffConfirmPasswordGroup");
+  const staffAuthModeBtn = document.getElementById("staffAuthModeBtn");
+  const staffAuthSubmitBtn = document.getElementById("staffAuthSubmitBtn");
+  const staffAuthDescription = document.getElementById("staffAuthDescription");
   const staffGateError = document.getElementById("staffGateError");
   const studentFormView = document.getElementById("studentFormView");
   const staffDashboardView = document.getElementById("staffDashboardView");
@@ -47,6 +51,16 @@
   let appMode = "student";
   let currentStaffApplicationId = "";
   let dashboardStatus = "Pending Review";
+  let dashboardApplications = [];
+  let currentStaffEmail = "";
+  let lastSubmittedApplication = null;
+  let staffAuthMode = "signup";
+  const TEST_STAFF_EMAIL = "swathi.24cs@kct.ac.in";
+
+  function isAllowedStaffEmail(email) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    return /@kia\.ac\.in$/.test(normalizedEmail) || normalizedEmail === TEST_STAFF_EMAIL;
+  }
 
   const SECTION_LABELS = {
     identity: "Identity",
@@ -444,155 +458,14 @@
     });
   })();
 
-  /* ---------------- Student photo upload ---------------- */
-  const studentPhotoInput = document.getElementById("studentPhoto");
-  const photoPreviewImg = document.getElementById("photoPreviewImg");
-  const photoPlaceholder = document.getElementById("photoPlaceholder");
-  const removePhotoBtn = document.getElementById("removePhoto");
-  let studentPhotoDataUrl = "";
-
-  function compressImageToDataUrl(file, maxDim, quality) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("Could not read the selected file."));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error("Could not read that image."));
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > height && width > maxDim) {
-            height = Math.round(height * (maxDim / width));
-            width = maxDim;
-          } else if (height >= width && height > maxDim) {
-            width = Math.round(width * (maxDim / height));
-            height = maxDim;
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", quality));
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function showPhotoPreview(dataUrl) {
-    if (photoPreviewImg) {
-      photoPreviewImg.src = dataUrl;
-      photoPreviewImg.hidden = false;
-    }
-    if (photoPlaceholder) photoPlaceholder.hidden = true;
-    if (removePhotoBtn) removePhotoBtn.hidden = false;
-  }
-
-  function clearPhotoPreview() {
-    if (photoPreviewImg) {
-      photoPreviewImg.hidden = true;
-      photoPreviewImg.src = "";
-    }
-    if (photoPlaceholder) photoPlaceholder.hidden = false;
-    if (removePhotoBtn) removePhotoBtn.hidden = true;
-  }
-
-  if (studentPhotoInput) {
-    studentPhotoInput.addEventListener("change", async () => {
-      const file = studentPhotoInput.files && studentPhotoInput.files[0];
-      if (!file) return;
-
-      if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
-        alert("Please choose a JPG or PNG image.");
-        studentPhotoInput.value = "";
-        return;
-      }
-      if (file.size > 3 * 1024 * 1024) {
-        alert("Please choose an image under 3MB.");
-        studentPhotoInput.value = "";
-        return;
-      }
-
-      try {
-        studentPhotoDataUrl = await compressImageToDataUrl(file, 600, 0.85);
-        showPhotoPreview(studentPhotoDataUrl);
-        saveDraft();
-      } catch (err) {
-        console.error("Photo processing failed.", err);
-        alert("Could not process that image. Please try another file.");
-        studentPhotoInput.value = "";
-      }
-    });
-  }
-
-  if (removePhotoBtn) {
-    removePhotoBtn.addEventListener("click", () => {
-      studentPhotoDataUrl = "";
-      if (studentPhotoInput) studentPhotoInput.value = "";
-      clearPhotoPreview();
-      saveDraft();
-    });
-  }
-
-  /* ---------------- Draft autosave ---------------- */
-  let saveTimer;
+  /* ---------------- Submission-only storage ---------------- */
   function saveDraft() {
-    clearTimeout(saveTimer);
-    saveIndicator.textContent = "Saving\u2026";
-    saveTimer = setTimeout(() => {
-      const data = collectData();
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
-        saveIndicator.textContent = "Draft saved";
-      } catch (err) {
-        saveIndicator.textContent = "Could not save draft";
-      }
-    }, 400);
+    saveIndicator.textContent = "Not saved until submission";
   }
 
   function loadDraft() {
-    let raw;
-    try {
-      raw = localStorage.getItem(DRAFT_KEY);
-    } catch (err) {
-      return;
-    }
-    if (!raw) return;
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (err) {
-      return;
-    }
-
-    // restore achievements first so their fields exist
-    const achKeys = Object.keys(data).filter((k) => /^achCategory_\d+$/.test(k));
-    achKeys.forEach((k) => {
-      const n = k.split("_")[1];
-      addAchievement({
-        achCategory: data[`achCategory_${n}`],
-        achActivity: data[`achActivity_${n}`],
-        achLevel: data[`achLevel_${n}`],
-        achType: data[`achType_${n}`],
-        achDescription: data[`achDescription_${n}`]
-      });
-    });
-
-    Object.entries(data).forEach(([key, value]) => {
-      const el = form.elements[key];
-      if (!el) return;
-      if (el.type === "file") return;
-      if (el.type === "checkbox") el.checked = !!value;
-      else if (el.value !== undefined) el.value = value;
-    });
-
-    if (data.studentPhoto) {
-      studentPhotoDataUrl = data.studentPhoto;
-      showPhotoPreview(studentPhotoDataUrl);
-    }
+    // Browser drafts are intentionally disabled. Form submissions and
+    // dashboard records are stored and fetched through Supabase only.
   }
 
   /* ---------------- Data collection ---------------- */
@@ -604,12 +477,11 @@
       if (el.type === "checkbox") data[el.name] = el.checked;
       else data[el.name] = el.value;
     });
-    data.studentPhoto = studentPhotoDataUrl || "";
     return data;
   }
 
-  function getHostelDataFromForm() {
-    const data = collectData();
+  function getHostelDataFromForm(sourceData = null) {
+    const data = sourceData || collectData();
     const visitors = [];
     const visitorCards = hostelVisitorsList ? Array.from(hostelVisitorsList.children) : [];
 
@@ -620,9 +492,7 @@
         phone: data[`hostelVisitorPhone_${index + 1}`] || "",
         relationship: data[`hostelVisitorRelation_${index + 1}`] || ""
       };
-      if (entry.name || entry.address || entry.phone || entry.relationship) {
-        visitors.push(entry);
-      }
+      visitors.push(entry);
     });
 
     return {
@@ -768,91 +638,57 @@
     }).filter((achievement) => Object.values(achievement).some(Boolean));
   }
 
-  async function saveApplicationToSupabase(formData) {
+  async function savePendingApplicationToSupabase(formData) {
     if (typeof supabaseClient === "undefined") {
       throw new Error("Supabase is not available. Check supabase-client.js and refresh the page.");
     }
 
-    // The compressed photo is retained locally for the PDF; it is uploaded to
-    // Storage separately and must not be placed in the database RPC payload.
-    const databaseData = { ...formData };
-    delete databaseData.studentPhoto;
-
-    const { data, error } = await supabaseClient.rpc("submit_admission", {
-      p_form: databaseData,
-      p_achievements: buildAchievementsPayload(databaseData)
+    const { data, error } = await supabaseClient.rpc("submit_pending_admission", {
+      p_form: formData,
+      p_achievements: buildAchievementsPayload(formData)
     });
 
     if (error) throw error;
-    if (!Array.isArray(data) || !data[0]?.registration_number) {
-      throw new Error("Supabase did not return a registration number.");
+    if (!Array.isArray(data) || !data[0]?.application_id) {
+      throw new Error("Supabase did not return a pending application ID.");
     }
     return data[0];
   }
 
-  async function uploadStudentPhoto(identityId) {
-    if (!studentPhotoDataUrl) return "";
-
-    const response = await fetch(studentPhotoDataUrl);
-    const photoBlob = await response.blob();
-    const photoPath = `${identityId}/passport-photo.jpg`;
-    const { error: uploadError } = await supabaseClient.storage
-      .from("student-photos")
-      .upload(photoPath, photoBlob, {
-        cacheControl: "31536000",
-        contentType: "image/jpeg",
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { error: savePathError } = await supabaseClient.rpc("set_identity_photo_path", {
-      p_identity_id: identityId,
-      p_photo_path: photoPath
-    });
-    if (savePathError) throw savePathError;
-
-    return photoPath;
-  }
-
   function buildSubmissionFilename(data) {
     const safeStudentName = (data.studentName || "student").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() || "student";
-    const regNumber = (data.registerNumber || "").trim();
-    return regNumber ? `KIA_Admission_Form_${safeStudentName}_${regNumber}.pdf` : `KIA_Admission_Form_${safeStudentName}.pdf`;
+    const recordNumber = (data.registerNumber || data.applicationId || "").trim();
+    return recordNumber ? `KIA_Admission_Form_${safeStudentName}_${recordNumber}.pdf` : `KIA_Admission_Form_${safeStudentName}.pdf`;
   }
 
-  function readPendingApplications() {
-    try {
-      const raw = localStorage.getItem(PENDING_APPLICATIONS_KEY);
-      const applications = raw ? JSON.parse(raw) : [];
-      return Array.isArray(applications) ? applications : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  function writePendingApplications(applications) {
-    localStorage.setItem(PENDING_APPLICATIONS_KEY, JSON.stringify(applications));
-  }
-
-  function createPendingApplication(data) {
-    const id = `APP-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
-    const application = {
-      applicationId: id,
-      status: "Pending Review",
-      submittedAt: new Date().toISOString(),
-      data: { ...data, applicationId: id, registerNumber: data.registerNumber || "", rollNumber: data.rollNumber || "" }
+  function mapSupabaseApplication(application) {
+    const data = { ...(application.form_data || {}) };
+    data.applicationId = application.application_id;
+    data.registerNumber = application.registration_number || data.registerNumber || "";
+    return {
+      applicationId: application.application_id,
+      status: application.status,
+      submittedAt: application.submitted_at,
+      data
     };
-    writePendingApplications([...readPendingApplications(), application]);
-    return application;
   }
 
-  function updatePendingApplication(application) {
-    const applications = readPendingApplications();
-    const index = applications.findIndex((item) => item.applicationId === application.applicationId);
-    if (index === -1) return;
-    applications[index] = application;
-    writePendingApplications(applications);
+  async function loadDashboardApplications() {
+    const { data, error } = await supabaseClient.rpc("list_pending_admissions", {
+      p_status: dashboardStatus
+    });
+    if (error) throw error;
+    dashboardApplications = (data || []).map(mapSupabaseApplication);
+    return dashboardApplications;
+  }
+
+  async function savePendingApplication(application) {
+    const { error } = await supabaseClient.rpc("save_pending_admission", {
+      p_application_id: application.applicationId,
+      p_form: application.data,
+      p_achievements: buildAchievementsPayload(application.data)
+    });
+    if (error) throw error;
   }
 
   function resetDynamicFields() {
@@ -866,9 +702,6 @@
   function resetAdmissionForm() {
     form.reset();
     resetDynamicFields();
-    studentPhotoDataUrl = "";
-    clearPhotoPreview();
-    try { localStorage.removeItem(DRAFT_KEY); } catch (error) {}
     form.querySelectorAll(".has-error").forEach((field) => field.classList.remove("has-error"));
     form.querySelectorAll(".field__error").forEach((error) => error.remove());
     reviewSummary.innerHTML = "";
@@ -906,10 +739,6 @@
       if (element.type === "checkbox") element.checked = !!value;
       else element.value = value == null ? "" : value;
     });
-    if (data.studentPhoto) {
-      studentPhotoDataUrl = data.studentPhoto;
-      showPhotoPreview(studentPhotoDataUrl);
-    }
     const bloodGroupOtherField = document.getElementById("bloodGroupOtherField");
     const communityOtherField = document.getElementById("communityOtherField");
     if (bloodGroupOtherField) bloodGroupOtherField.style.display = data.bloodGroup === "Other" ? "block" : "none";
@@ -953,7 +782,7 @@
     document.body.classList.remove("staff-review-mode");
   }
 
-  function showStaffDashboard() {
+  async function showStaffDashboard() {
     appMode = "staff";
     landingView.hidden = true;
     studentFormView.hidden = true;
@@ -961,7 +790,16 @@
     staffFormBackBtn.hidden = true;
     staffDashboardView.hidden = false;
     document.body.classList.remove("staff-review-mode");
-    renderDashboard();
+    try {
+      await loadDashboardApplications();
+      renderDashboard();
+    } catch (error) {
+      console.error("Could not load the staff dashboard.", error);
+      const detail = String(error?.message || "").trim();
+      showSubmissionStatus(detail
+        ? `Could not load applications: ${detail}`
+        : "Could not load applications. Run the staff-access SQL migration, then sign in again.", true);
+    }
   }
 
   function applicationMatches(application, query) {
@@ -973,8 +811,7 @@
 
   function renderDashboard() {
     const query = String(applicationSearch.value || "").trim().toLowerCase();
-    const applications = readPendingApplications()
-      .filter((application) => application.status === dashboardStatus)
+    const applications = dashboardApplications
       .filter((application) => applicationMatches(application, query));
     applicationsTableBody.innerHTML = "";
     dashboardEmpty.classList.toggle("is-visible", applications.length === 0);
@@ -991,13 +828,15 @@
         <td>${escapeHtml(data.email || "")}</td>
         <td><span class="status-badge${statusClass}">${escapeHtml(application.status)}</span></td>
         <td>${escapeHtml(new Date(application.submittedAt).toLocaleString())}</td>
-        <td><button type="button" class="btn btn--secondary dashboard-open-btn" data-application-id="${escapeHtml(application.applicationId)}">Open</button></td>`;
+        <td>${application.status === "Pending Review"
+          ? `<button type="button" class="btn btn--secondary dashboard-open-btn" data-application-id="${escapeHtml(application.applicationId)}">Open</button>`
+          : `<span class="dashboard-readonly">Locked after approval</span>`}</td>`;
       applicationsTableBody.appendChild(row);
     });
   }
 
   function openStaffApplication(applicationId) {
-    const application = readPendingApplications().find((item) => item.applicationId === applicationId);
+    const application = dashboardApplications.find((item) => item.applicationId === applicationId);
     if (!application) return;
     restoreApplicationToForm(application.data || {});
     currentStaffApplicationId = applicationId;
@@ -1012,20 +851,62 @@
     sectionStatus.textContent = "Staff review";
   }
 
-  function saveStaffApplication(approve) {
-    const application = readPendingApplications().find((item) => item.applicationId === currentStaffApplicationId);
+  async function saveStaffApplication(approve) {
+    const application = dashboardApplications.find((item) => item.applicationId === currentStaffApplicationId);
     if (!application) return;
     application.data = collectData();
     application.data.applicationId = application.applicationId;
-    if (approve) application.status = "Approved";
-    updatePendingApplication(application);
-    if (approve) {
+    if (!approve) {
+      try {
+        await savePendingApplication(application);
+      } catch (error) {
+        console.error("Could not save staff changes.", error);
+        showSubmissionStatus("Unable to save changes to Supabase.", true);
+        return;
+      }
+      staffReviewIdentity.textContent = `${application.data.studentName || "Student"} · ${application.data.registerNumber || application.applicationId}`;
+      showSubmissionStatus("Changes saved", false);
+      return;
+    }
+
+    const approveButton = document.getElementById("staffApproveBtn");
+    const previousLabel = approveButton.textContent;
+    approveButton.disabled = true;
+    approveButton.textContent = "Approving Application...";
+
+    try {
+      // Preserve staff edits before the approval transaction reads the form.
+      await savePendingApplication(application);
+      // This is the only point at which a pending student application is
+      // forwarded to the official admission records in Supabase.
+      const { data: approvalData, error: approvalError } = await supabaseClient.rpc("approve_pending_admission", {
+        p_application_id: application.applicationId
+      });
+      if (approvalError) throw approvalError;
+      const submission = approvalData && approvalData[0];
+      if (!submission?.registration_number) throw new Error("Supabase did not return an approval registration number.");
+      application.status = "Approved";
+      application.approvedAt = new Date().toISOString();
+      application.data.registerNumber = submission.registration_number;
+      application.data.rollNumber = "";
+      dashboardApplications = dashboardApplications.map((item) => item.applicationId === application.applicationId ? application : item);
+      const pdfOutput = buildOfficialAdmissionPdf(application.data, {
+        returnBlob: true,
+        filename: buildSubmissionFilename(application.data),
+        openViewer: false,
+        saveFile: false
+      });
+      openGeneratedPdf(pdfOutput.blob, pdfOutput.filename);
       dashboardStatus = "Approved";
       document.querySelectorAll(".dashboard-tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.status === dashboardStatus));
       showStaffDashboard();
-    } else {
-      staffReviewIdentity.textContent = `${application.data.studentName || "Student"} · ${application.data.registerNumber || application.applicationId}`;
-      showSubmissionStatus("Changes saved", false);
+      showSubmissionStatus("Application approved and forwarded to the supervisor records", false);
+    } catch (error) {
+      console.error("Approval failed.", error);
+      showSubmissionStatus("Unable to forward this application to the supervisor records. It remains pending for review.", true);
+    } finally {
+      approveButton.disabled = false;
+      approveButton.textContent = previousLabel;
     }
   }
 
@@ -1075,58 +956,36 @@
       button.textContent = "Submitting Application...";
     });
 
-    let submissionStatus = "pending";
-
     try {
-      const submittedAt = new Date().toISOString();
-      const submission = await saveApplicationToSupabase(data);
-      const savedData = {
+      // A student submission is intentionally kept out of the official
+      // admission tables. Staff forwards it only after their approval.
+      const pendingSubmission = await savePendingApplicationToSupabase(data);
+      const pendingApplication = {
+        applicationId: pendingSubmission.application_id,
+        submittedAt: pendingSubmission.submitted_at,
+        data
+      };
+      lastSubmittedApplication = {
         ...data,
+        applicationId: pendingApplication.applicationId,
         submittedAt: pendingApplication.submittedAt,
-        registerNumber: data.registerNumber || "",
+        registerNumber: "",
         rollNumber: ""
       };
-
-      submissionStatus = "database-saved";
-
-      const pdfOutput = buildOfficialAdmissionPdf({ ...savedData }, {
-        returnBlob: true,
-        filename: buildSubmissionFilename(savedData),
-        openViewer: false,
-        saveFile: false
-      });
-
-      if (!pdfOutput || !pdfOutput.blob || !(pdfOutput.blob.size > 0)) {
-        throw new Error("PDF generation failed: empty or missing PDF blob.");
-      }
-
-      const previewResult = openGeneratedPdf(pdfOutput.blob, pdfOutput.filename);
-      submissionStatus = previewResult.downloadTriggered ? "success" : "error";
-
-      try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+      resetAdmissionForm();
 
       const overlayTitle = document.querySelector("#successOverlay h2");
       const overlayText = document.querySelector("#successOverlay p");
       if (overlayTitle) overlayTitle.textContent = "Application submitted successfully.";
       if (overlayText) {
-        const previewNote = previewResult.previewOpened
-          ? " Your PDF has been downloaded and opened for preview."
-          : " Your PDF has been downloaded successfully. If the preview did not open automatically, you can open the downloaded PDF manually.";
-        overlayText.innerHTML = `Your application is pending staff review.${previewNote}<br><strong>Application ID: ${pendingApplication.applicationId}</strong><br>Please keep the downloaded PDF for your records.`;
+        overlayText.innerHTML = `Your application has been sent for staff review.<br><strong>Application ID: ${pendingApplication.applicationId}</strong><br>A PDF will be generated only after staff approval.`;
       }
 
       successOverlay.hidden = false;
-      showSubmissionStatus("Application Submitted", false);
+      showSubmissionStatus("Application sent for staff review", false);
     } catch (error) {
-      if (submissionStatus === "success") {
-        return;
-      }
-
       console.error("Submission failed.", error);
-      const message = submissionStatus === "database-saved"
-        ? "Your application was saved, but the photo or PDF could not be completed. Please contact the administrator before submitting again."
-        : "Unable to submit your application. Please try again.";
-      showSubmissionStatus(message, true);
+      showSubmissionStatus("Unable to submit your application for staff review. Please try again.", true);
       controls.forEach((button) => {
         button.disabled = false;
         button.textContent = button.id === "reviewSubmitBtn" ? "Submit Application" : "Submit application";
@@ -1146,8 +1005,12 @@
     const margin = 14;
     const contentW = pageW - margin * 2;
     let y = 18;
-    const hostelData = getHostelDataFromForm();
-    const isHostel = !!(hostelStatus && hostelStatus.value === "Yes");
+    const hostelData = getHostelDataFromForm(data);
+    const isHostel = String(data.hostelStatus || "").toLowerCase() === "yes";
+    const displayPdfValue = (value) => {
+      if (value === null || value === undefined || String(value).trim() === "") return "Not provided";
+      return String(value);
+    };
 
     const ensureSpace = (needed) => {
       if (y + needed > pageH - 18) {
@@ -1201,53 +1064,62 @@
       return { lines, fontSize, lineHeight };
     };
 
+    // One field per row provides a stable, readable layout even for long
+    // addresses, names and descriptions. Long values are continued on a new
+    // page inside their own bordered row instead of crossing borders.
     const drawKeyValueTable = (title, rows) => {
       if (!rows || !rows.length) return;
       sectionHeading(title);
-      const left = margin;
-      const tableW = contentW;
-      const pairGroups = [];
-      for (let i = 0; i < rows.length; i += 2) {
-        pairGroups.push(rows.slice(i, i + 2));
-      }
+      const labelW = 57;
+      const valueW = contentW - labelW;
+      const bottomMargin = 18;
 
-      pairGroups.forEach((group) => {
-        const fieldCount = group.length;
-        const cellW = tableW / fieldCount;
-        const cellLabelW = Math.min(46, cellW * 0.42);
-        const cellValueW = cellW - cellLabelW;
-        const groupHeight = Math.max(12, ...group.map(([label, value]) => {
-          const labelLines = splitValue(label, cellLabelW - 4);
-          const valueLines = valueLayout(value, cellValueW - 6).lines;
-          return Math.max(labelLines.length * 4.2, valueLines.length * 4.2) + 8;
-        }));
-        ensureSpace(groupHeight + 2);
-        const currentY = y;
-        doc.setDrawColor(70, 70, 70);
-        doc.setLineWidth(0.2);
-        group.forEach(([,], fieldIndex) => {
-          const x = left + (fieldIndex * cellW);
-          doc.rect(x, currentY, cellW, groupHeight);
-          doc.line(x + cellLabelW, currentY, x + cellLabelW, currentY + groupHeight);
-        });
+      rows.forEach(([label, rawValue]) => {
+        const value = displayPdfValue(rawValue);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        const labelLines = doc.splitTextToSize(String(label), labelW - 7);
+        const layout = valueLayout(value, valueW - 8, pageH - 40);
+        let remainingLines = layout.lines.slice();
+        let continuation = false;
 
-        group.forEach(([label, value], fieldIndex) => {
-          const x = left + (fieldIndex * cellW);
-          const labelLines = splitValue(label, cellLabelW - 4);
-          const valueLayoutResult = valueLayout(value, cellValueW - 6, groupHeight - 8);
+        while (remainingLines.length) {
+          const availableHeight = pageH - bottomMargin - y;
+          if (availableHeight < 14) {
+            doc.addPage();
+            y = 18;
+            sectionHeading(`${title} (continued)`);
+          }
+
+          const lineCapacity = Math.max(1, Math.floor((pageH - bottomMargin - y - 7) / layout.lineHeight));
+          const valueLines = remainingLines.splice(0, lineCapacity);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          const visibleLabelLines = continuation
+            ? doc.splitTextToSize(`${label} (continued)`, labelW - 7)
+            : labelLines;
+          const rowHeight = Math.max(
+            12,
+            valueLines.length * layout.lineHeight + 7,
+            visibleLabelLines.length * 3.8 + 7
+          );
+          const rowY = y;
+          doc.setDrawColor(70, 70, 70);
+          doc.setLineWidth(0.2);
+          doc.rect(margin, rowY, contentW, rowHeight);
+          doc.line(margin + labelW, rowY, margin + labelW, rowY + rowHeight);
+
           doc.setTextColor(40, 40, 40);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.8);
-          labelLines.forEach((line, idx) => {
-            doc.text(line, x + 3, currentY + 5 + idx * 4.2);
-          });
+          doc.setFontSize(7.5);
+          visibleLabelLines.forEach((line, index) => doc.text(line, margin + 3, rowY + 5 + index * 3.8));
+
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(valueLayoutResult.fontSize);
-          valueLayoutResult.lines.forEach((line, idx) => {
-            doc.text(line || "", x + cellLabelW + 4, currentY + 5 + idx * valueLayoutResult.lineHeight);
-          });
-        });
-        y = currentY + groupHeight;
+          doc.setFontSize(layout.fontSize);
+          valueLines.forEach((line, index) => doc.text(String(line || ""), margin + labelW + 4, rowY + 5 + index * layout.lineHeight));
+          y = rowY + rowHeight;
+          continuation = true;
+        }
       });
       y += 4;
     };
@@ -1284,14 +1156,15 @@
       doc.setDrawColor(70, 70, 70);
       doc.setLineWidth(0.2);
       rows.slice(1).forEach((row) => {
-        const rowLayouts = row.map((item, index) => valueLayout(item, columnWidths[index] - 6));
+        const displayRow = row.map(displayPdfValue);
+        const rowLayouts = displayRow.map((item, index) => valueLayout(item, columnWidths[index] - 6));
         const rowH = Math.max(12, ...rowLayouts.map((layout) => 6 + layout.lines.length * layout.lineHeight));
         const pageBefore = doc.internal.getNumberOfPages();
         ensureSpace(rowH + 2);
         if (doc.internal.getNumberOfPages() !== pageBefore) drawTableHeader();
         const cursorY = y;
         let cellX = left;
-        row.forEach((cell, index) => {
+        displayRow.forEach((cell, index) => {
           const colWidth = columnWidths[index];
           doc.rect(cellX, cursorY, colWidth, rowH);
           doc.setFont("helvetica", "normal");
@@ -1343,52 +1216,6 @@
       y += 16;
     };
 
-    const addPhotoField = () => {
-      const boxW = 32;
-      const boxH = 38;
-      const boxX = pageW - margin - boxW;
-      ensureSpace(boxH + 8);
-      const boxY = y;
-
-      doc.setDrawColor(70, 70, 70);
-      doc.setLineWidth(0.3);
-      doc.rect(boxX, boxY, boxW, boxH);
-
-      if (data.studentPhoto) {
-        try {
-          doc.addImage(data.studentPhoto, "JPEG", boxX + 1, boxY + 1, boxW - 2, boxH - 2);
-        } catch (err) {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(7);
-          doc.setTextColor(150, 150, 150);
-          doc.text("Photo unavailable", boxX + boxW / 2, boxY + boxH / 2, { align: "center" });
-        }
-      } else {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(150, 150, 150);
-        const lines = doc.splitTextToSize("Affix recent passport size photograph", boxW - 4);
-        const startY = boxY + boxH / 2 - ((lines.length - 1) * 3.4) / 2;
-        lines.forEach((line, idx) => doc.text(line, boxX + boxW / 2, startY + idx * 3.4, { align: "center" }));
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(30, 30, 30);
-      doc.text("Passport Size Photograph", margin, boxY + 6);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(90, 90, 90);
-      const noteLines = doc.splitTextToSize(
-        "A copy of the uploaded photograph is printed alongside the student's official record.",
-        contentW - boxW - 14
-      );
-      noteLines.forEach((line, idx) => doc.text(line, margin, boxY + 12 + idx * 4.2));
-
-      y = boxY + boxH + 8;
-    };
-
     const addHeader = () => {
       doc.setFillColor(245, 245, 240);
       doc.rect(0, 0, pageW, 18, "F");
@@ -1420,10 +1247,10 @@
       doc.rect(rightBoxX + 35, boxY, boxW - 35, boxH);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
-      doc.text("Registration No.", leftBoxX + 4, boxY + 8);
+      doc.text(data.registerNumber ? "Registration No." : "Application ID", leftBoxX + 4, boxY + 8);
       doc.text("Roll No.", rightBoxX + 4, boxY + 8);
 
-      const regVal = data.registerNumber || "";
+      const regVal = data.registerNumber || data.applicationId || "";
       const rollVal = data.rollNumber || "";
       if (regVal) {
         doc.setFont("helvetica", "normal");
@@ -1437,7 +1264,6 @@
     };
 
     addHeader();
-    addPhotoField();
     addPartHeader("PART A — COLLEGE ADMISSION FORM");
 
     drawKeyValueTable("1. STUDENT & ADMISSION DETAILS", [
@@ -1555,10 +1381,12 @@
       ["Aadhaar Number", data.aadhaarNumber || ""]
     ]);
 
-    const achCards = Array.from(achievementsList.children);
-    if (achCards.length) {
-      const achievementRows = achCards.map((card) => {
-        const n = card.dataset.achievement;
+    const achievementNumbers = Object.keys(data)
+      .map((key) => key.match(/^achActivity_(\d+)$/))
+      .filter(Boolean)
+      .map((match) => Number(match[1]))
+      .sort((a, b) => a - b);
+    const achievementRows = (achievementNumbers.length ? achievementNumbers : [1]).map((n) => {
         return [
           data[`achCategory_${n}`] || "",
           data[`achActivity_${n}`] || "",
@@ -1567,22 +1395,21 @@
           data[`achDescription_${n}`] || ""
         ];
       });
-      drawBlockTable("9. ACHIEVEMENTS", [
-        ["Category", "Activity", "Level", "Type", "Description"],
-        ...achievementRows
-      ], [
-        { title: "Category", width: 28 },
-        { title: "Activity", width: 35 },
-        { title: "Level", width: 22 },
-        { title: "Type", width: 22 },
-        { title: "Description", width: 75 }
-      ]);
-    }
+    drawBlockTable("9. ACHIEVEMENTS", [
+      ["Category", "Activity", "Level", "Type", "Description"],
+      ...achievementRows
+    ], [
+      { title: "Category", width: 28 },
+      { title: "Activity", width: 35 },
+      { title: "Level", width: 22 },
+      { title: "Type", width: 22 },
+      { title: "Description", width: 75 }
+    ]);
 
     addDeclaration("10. COLLEGE ADMISSION DECLARATION", "I hereby declare that all the above furnished details are true to the best of my knowledge.");
 
-    if (isHostel) {
-      addPartHeader("PART B — HOSTEL ADMISSION FORM");
+    {
+      addPartHeader(isHostel ? "PART B — HOSTEL ADMISSION FORM" : "PART B — HOSTEL ADMISSION FORM (NOT SELECTED)");
 
       drawKeyValueTable("1. HOSTEL APPLICANT DETAILS", [
         ["Roll No.", hostelData.rollNumber || ""],
@@ -1707,6 +1534,18 @@
   document.getElementById("closeOverlay").addEventListener("click", () => {
     successOverlay.hidden = true;
   });
+  if (downloadSubmittedPdfBtn) {
+    downloadSubmittedPdfBtn.addEventListener("click", () => {
+      if (!lastSubmittedApplication) return;
+      const pdfOutput = buildOfficialAdmissionPdf(lastSubmittedApplication, {
+        returnBlob: true,
+        filename: buildSubmissionFilename(lastSubmittedApplication),
+        openViewer: false,
+        saveFile: false
+      });
+      openGeneratedPdf(pdfOutput.blob, pdfOutput.filename);
+    });
+  }
 
   /* ---------------- PDF export (mirrors the official paper form) ---------------- */
   const PDF = {
@@ -1886,23 +1725,83 @@
   });
 
   document.getElementById("staffBackBtn").addEventListener("click", showLanding);
-  staffGateForm.addEventListener("submit", (event) => {
+  function setStaffAuthMode(mode) {
+    staffAuthMode = mode;
+    const isSignup = mode === "signup";
+    staffConfirmPasswordGroup.hidden = !isSignup;
+    staffConfirmPasswordInput.required = isSignup;
+    staffPasswordInput.autocomplete = isSignup ? "new-password" : "current-password";
+    staffAuthDescription.textContent = isSignup
+      ? "Create your staff account with your institutional email and a secure password."
+      : "Log in with your institutional email and password to review applications.";
+    staffAuthSubmitBtn.textContent = isSignup ? "Create Staff Account" : "Log in to Staff Dashboard";
+    staffAuthModeBtn.textContent = isSignup ? "Already registered? Log in" : "First time here? Create account";
+    staffGateError.textContent = "";
+  }
+  staffAuthModeBtn.addEventListener("click", () => setStaffAuthMode(staffAuthMode === "signup" ? "login" : "signup"));
+  staffGateForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const email = staffEmailInput.value.trim();
-    if (!/@kia\.ac\.in$/i.test(email)) {
-      staffGateError.textContent = "Please enter a valid institutional email ending with @kia.ac.in.";
+    const email = staffEmailInput.value.trim().toLowerCase();
+    if (!isAllowedStaffEmail(email)) {
+      staffGateError.textContent = "Please enter an authorized staff email address.";
       staffEmailInput.focus();
       return;
     }
+    if (staffPasswordInput.value.length < 8) {
+      staffGateError.textContent = "Use a password with at least 8 characters.";
+      staffPasswordInput.focus();
+      return;
+    }
+    if (staffAuthMode === "signup" && staffPasswordInput.value !== staffConfirmPasswordInput.value) {
+      staffGateError.textContent = "Password and confirmation password do not match.";
+      staffConfirmPasswordInput.focus();
+      return;
+    }
     staffGateError.textContent = "";
-    showStaffDashboard();
+    staffAuthSubmitBtn.disabled = true;
+    staffAuthSubmitBtn.textContent = staffAuthMode === "signup" ? "Creating account..." : "Logging in...";
+    try {
+      if (staffAuthMode === "signup") {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email,
+          password: staffPasswordInput.value
+        });
+        if (error) throw error;
+        if (!data.session) {
+          staffGateError.textContent = "Account was created, but email confirmation is still enabled in Supabase. Disable Confirm email to use password-only access.";
+          return;
+        }
+      } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({
+          email,
+          password: staffPasswordInput.value
+        });
+        if (error) throw error;
+      }
+      currentStaffEmail = email;
+      await showStaffDashboard();
+    } catch (error) {
+      console.error("Staff authentication failed.", error);
+      const message = String(error?.message || "Unable to complete staff sign-in.");
+      if (/already registered|already exists|user already/i.test(message) && staffAuthMode === "signup") {
+        setStaffAuthMode("login");
+        staffGateError.textContent = "This email already has a Supabase Auth account. For the one-time test reset, run the reset SQL migration, then create the account again.";
+      } else {
+        staffGateError.textContent = /email provider is disabled/i.test(message)
+          ? "Supabase Email provider is disabled. Enable Authentication → Providers → Email in Supabase, then try again."
+          : message;
+      }
+    } finally {
+      staffAuthSubmitBtn.disabled = false;
+      staffAuthSubmitBtn.textContent = staffAuthMode === "signup" ? "Create Staff Account" : "Log in to Staff Dashboard";
+    }
   });
   applicationSearch.addEventListener("input", renderDashboard);
   document.querySelectorAll(".dashboard-tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
+    tab.addEventListener("click", async () => {
       dashboardStatus = tab.dataset.status;
       document.querySelectorAll(".dashboard-tab").forEach((item) => item.classList.toggle("is-active", item === tab));
-      renderDashboard();
+      await showStaffDashboard();
     });
   });
   applicationsTableBody.addEventListener("click", (event) => {
@@ -1921,6 +1820,7 @@
 
   /* ---------------- Init ---------------- */
   addAchievement(); // start with one empty achievement card
+  try { localStorage.removeItem("kia_admission_draft_v1"); } catch (error) {}
   if (hostelStatus) {
     hostelStatus.addEventListener("change", syncHostelStep);
   }

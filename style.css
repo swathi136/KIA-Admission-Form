@@ -159,6 +159,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
 .status-badge--approved { color: #6b4b00; background: var(--amber-100); }
 .dashboard-empty { display: none; margin: 0; padding: 28px; text-align: center; color: var(--ink-400); }
 .dashboard-empty.is-visible { display: block; }
+.dashboard-readonly { color: var(--ink-400); font-size: 12px; font-style: italic; white-space: nowrap; }
 .staff-review-mode .review-actions, .staff-review-mode .panel--review .checkbox { display: none; }
 
 @media (max-width: 760px) {

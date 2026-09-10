@@ -44,14 +44,21 @@
   <section class="entry-card" id="staffGateView" hidden>
     <p class="panel__eyebrow">Staff workspace</p>
     <h1>Staff Entry</h1>
-    <p class="entry-card__desc">Enter your institutional email address to continue.</p>
+    <p class="entry-card__desc" id="staffAuthDescription">Create your staff account with your institutional email and a secure password.</p>
     <form id="staffGateForm" class="staff-gate-form">
       <label for="staffEmail">KIA email address</label>
       <input type="email" id="staffEmail" autocomplete="email" placeholder="name@kia.ac.in" required>
+      <label for="staffPassword">Password</label>
+      <input type="password" id="staffPassword" autocomplete="new-password" minlength="8" required>
+      <div id="staffConfirmPasswordGroup">
+        <label for="staffConfirmPassword">Confirm password</label>
+        <input type="password" id="staffConfirmPassword" autocomplete="new-password" minlength="8">
+      </div>
       <p class="field__error" id="staffGateError" role="alert"></p>
       <div class="entry-actions">
         <button type="button" class="btn btn--secondary" id="staffBackBtn">Back</button>
-        <button type="submit" class="btn btn--primary">Open Staff Dashboard</button>
+        <button type="button" class="btn btn--secondary" id="staffAuthModeBtn">Already registered? Log in</button>
+        <button type="submit" class="btn btn--primary" id="staffAuthSubmitBtn">Create Staff Account</button>
       </div>
     </form>
   </section>
@@ -94,18 +101,6 @@
           <p class="panel__eyebrow">Section 1</p>
           <h2>Identity</h2>
           <p class="panel__desc">Basic personal details as they should appear on official records.</p>
-        </div>
-        <div class="photo-upload">
-          <div class="photo-upload__preview" id="photoPreviewBox">
-            <span class="photo-upload__placeholder" id="photoPlaceholder">No photo selected</span>
-            <img id="photoPreviewImg" hidden>
-          </div>
-          <div class="photo-upload__controls">
-            <label for="studentPhoto" class="btn btn--secondary">Choose Photo</label>
-            <input type="file" id="studentPhoto" name="studentPhoto" accept="image/png, image/jpeg" hidden>
-            <button type="button" id="removePhoto" class="photo-upload__remove" hidden>Remove photo</button>
-            <p class="photo-upload__hint">Passport-size photo, JPG or PNG, under 3MB. This photo will also be printed on the admission PDF.</p>
-          </div>
         </div>
         <div class="grid">
           <div class="field">
@@ -745,11 +740,11 @@
         <div class="panel__head">
           <p class="panel__eyebrow">Final step</p>
           <h2>Review &amp; submit</h2>
-          <p class="panel__desc">Please review all the information you have entered carefully before submitting your application. Once submitted, the application will be saved and cannot be edited from this form.</p>
+          <p class="panel__desc">Please review all the information carefully before submitting. Your application will first be sent to the KIA staff dashboard for review and is forwarded to official supervisor records only after staff approval.</p>
         </div>
         <div class="review-instructions">
           <p>Please review all the details carefully before submitting your application. Make sure that all the information provided is correct and complete.</p>
-          <p>After submission, your application will be saved to the database and a PDF copy will be generated automatically.</p>
+          <p>After submission, your application will remain pending staff review and a PDF acknowledgement will be generated automatically.</p>
         </div>
         <div id="reviewSummary" class="review-summary"></div>
         <div class="review-actions">
@@ -783,7 +778,7 @@
       <p class="dashboard-head__desc">Review pending applications before they become official records.</p>
     </div>
     <div class="dashboard-head__actions">
-      <button type="button" class="btn btn--secondary" id="dashboardHomeBtn">Landing</button>
+      <button type="button" class="btn btn--secondary" id="dashboardHomeBtn">Back</button>
       <button type="button" class="btn btn--primary" id="newStudentBtn">+ New Student</button>
     </div>
   </div>
@@ -811,7 +806,8 @@
   <div class="overlay__card">
     <svg viewBox="0 0 52 52" width="52" height="52"><circle cx="26" cy="26" r="25" fill="none" stroke="var(--teal-700)" stroke-width="2"/><path fill="none" stroke="var(--teal-700)" stroke-width="3" d="M14 27l8 8 16-17"/></svg>
     <h2>Application recorded</h2>
-    <p>Your admission application has been submitted successfully. Please keep a copy of the form if needed before admission confirmation.</p>
+    <p>Your admission application has been sent for staff review. Please keep a copy of the form while approval is pending.</p>
+    <button type="button" class="btn btn--secondary" id="downloadSubmittedPdf">Download Submitted Copy</button>
     <button type="button" class="btn btn--primary" id="closeOverlay">Done</button>
   </div>
 </div>
