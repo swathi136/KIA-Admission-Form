@@ -116,10 +116,10 @@ begin
     raise exception 'Only an authenticated KIA staff account or the authorized test account can approve applications.' using errcode = '42501';
   end if;
 
-  select form_data, achievements, registration_number
+  select p.form_data, p.achievements, p.registration_number
   into v_form, v_achievements, v_pending_registration_number
-  from public.pending_admission_applications
-  where application_id = p_application_id and status = 'Pending Review'
+  from public.pending_admission_applications as p
+  where p.application_id = p_application_id and p.status = 'Pending Review'
   for update;
 
   if not found then
