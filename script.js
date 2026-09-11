@@ -528,13 +528,13 @@
   /* ---------------- Review rendering ---------------- */
   const REVIEW_GROUPS = [
     { title: "Identity", keys: ["studentName", "registerNumber", "dob", "gender", "bloodGroup", "nationality", "religion", "community", "caste", "motherTongue"] },
-    { title: "Admission", keys: ["tnauNumber", "admissionType", "admissionQuota", "firstGraduate", "hostelStatus", "batch"] },
+    { title: "Admission", keys: ["tnauNumber", "admissionType", "admissionQuota", "firstGraduate", "hostelStatus"] },
     { title: "Contact", keys: ["studentMobile", "whatsapp", "email", "commAddress", "permAddress", "district", "state", "pincode", "emergency1", "emergency2"] },
     { title: "Class X education", keys: ["xBoard", "xSchool", "xSchoolAddress", "xPassing", "xMedium", "xMarks"] },
     { title: "Class XII education", keys: ["xiiBoard", "xiiSchool", "xiiSchoolAddress", "xiiPassing", "xiiMedium", "xiiMarks"] },
     { title: "XII subject marks", keys: ["mLanguage", "mEnglish", "mMaths", "mPhysics", "mChemistry", "mBiology", "mBotany", "mZoology", "mComputerScience", "mTotal", "xiiCutoff", "emisNumber"] },
     { title: "Family", keys: ["fatherName", "fatherQualification", "fatherOccupation", "fatherCompany", "fatherEmail", "fatherMobile", "motherName", "motherQualification", "motherOccupation", "motherCompany", "motherEmail", "motherMobile", "familyIncome"] },
-    { title: "School & social background", keys: ["boardOfStudy", "mediumOfStudy", "schoolType", "tamilXii", "familyBackground"] },
+    { title: "School & social background", keys: ["schoolType", "tamilXii"] },
     { title: "Agricultural background", keys: ["landAvailability", "landArea", "majorCrops", "landLocality", "residenceType"] },
     { title: "Official / bank information", keys: ["bankHolder", "holderRelationship", "bankName", "bankBranch", "bankAccount", "bankIfsc", "loanAccount", "loanIfsc", "loanBankBranch", "passportNumber", "aadhaarNumber"] }
   ];
@@ -1311,8 +1311,7 @@
       ["Admission Type", data.admissionType || ""],
       ["Admission Quota", data.admissionQuota || ""],
       ["First Graduate", data.firstGraduate || ""],
-      ["Hosteller / Dayscholar", data.hostelStatus || ""],
-      ["Academic Year / Batch", data.batch || ""]
+      ["Hosteller / Dayscholar", data.hostelStatus || ""]
     ], "4. EDUCATIONAL PROFILE - X STANDARD", [
       ["Board", data.xBoard || ""],
       ["School Name", data.xSchool || ""],
@@ -1373,11 +1372,8 @@
     ]);
 
     drawKeyValueTable("7. ADDITIONAL INFORMATION", [
-      ["Board of Study", data.boardOfStudy || ""],
-      ["Medium of Study", data.mediumOfStudy || ""],
       ["School Type", data.schoolType || ""],
-      ["Studied Tamil in XII", data.tamilXii || ""],
-      ["Family Background", data.familyBackground || ""]
+      ["Studied Tamil in XII", data.tamilXii || ""]
     ]);
 
     drawKeyValueTable("8. AGRICULTURAL / FAMILY BACKGROUND", [
