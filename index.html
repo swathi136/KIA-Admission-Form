@@ -681,7 +681,18 @@
     </div>
     <div class="dashboard-head__actions">
       <button type="button" class="btn btn--secondary" id="dashboardHomeBtn">Back</button>
+      <button type="button" class="btn btn--secondary" onclick="window.location.href='analytics.html'">View Analytics</button>
       <button type="button" class="btn btn--primary" id="newStudentBtn">+ New Student</button>
+    </div>
+  </div>
+  <div class="dashboard-summary" aria-live="polite">
+    <div class="dashboard-summary__item">
+      <span class="dashboard-summary__label">Pending Review</span>
+      <strong id="dashboardPendingTotal">0</strong>
+    </div>
+    <div class="dashboard-summary__item">
+      <span class="dashboard-summary__label">Approved</span>
+      <strong id="dashboardApprovedTotal">0</strong>
     </div>
   </div>
   <div class="dashboard-toolbar">

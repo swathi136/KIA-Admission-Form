@@ -48,6 +48,8 @@
   const applicationsTableBody = document.getElementById("applicationsTableBody");
   const dashboardEmpty = document.getElementById("dashboardEmpty");
   const applicationSearch = document.getElementById("applicationSearch");
+  const dashboardPendingTotal = document.getElementById("dashboardPendingTotal");
+  const dashboardApprovedTotal = document.getElementById("dashboardApprovedTotal");
   let appMode = "student";
   let currentStaffApplicationId = "";
   let dashboardStatus = "Pending Review";
@@ -681,6 +683,24 @@
     return dashboardApplications;
   }
 
+  async function loadDashboardTotals() {
+    const [pending, approved] = await Promise.all([
+      supabaseClient.rpc("list_pending_admissions", { p_status: "Pending Review" }),
+      supabaseClient.rpc("list_pending_admissions", { p_status: "Approved" })
+    ]);
+
+    if (pending.error) throw pending.error;
+    if (approved.error) throw approved.error;
+
+    const pendingTotal = (pending.data || []).length;
+    const approvedTotal = (approved.data || []).length;
+
+    if (dashboardPendingTotal) dashboardPendingTotal.textContent = String(pendingTotal);
+    if (dashboardApprovedTotal) dashboardApprovedTotal.textContent = String(approvedTotal);
+
+    return { pendingTotal, approvedTotal };
+  }
+
   async function savePendingApplication(application) {
     const { error } = await supabaseClient.rpc("save_pending_admission", {
       p_application_id: application.applicationId,
@@ -781,6 +801,20 @@
     document.body.classList.remove("staff-review-mode");
   }
 
+  async function openDashboardIfSessionExists() {
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (!error && session) {
+        currentStaffEmail = session.user?.email || currentStaffEmail;
+        await showStaffDashboard();
+        return true;
+      }
+    } catch (error) {
+      console.error("Could not read the current Supabase session.", error);
+    }
+    return false;
+  }
+
   async function showStaffDashboard() {
     appMode = "staff";
     landingView.hidden = true;
@@ -790,7 +824,10 @@
     staffDashboardView.hidden = false;
     document.body.classList.remove("staff-review-mode");
     try {
-      await loadDashboardApplications();
+      await Promise.all([
+        loadDashboardTotals(),
+        loadDashboardApplications()
+      ]);
       renderDashboard();
     } catch (error) {
       console.error("Could not load the staff dashboard.", error);
@@ -1827,4 +1864,13 @@
   renderRail();
   goTo(0);
   updateProgress();
+
+  const shouldOpenStaffDashboard = new URLSearchParams(window.location.search).get("view") === "staff-dashboard";
+  if (shouldOpenStaffDashboard) {
+    openDashboardIfSessionExists().then((hasSession) => {
+      if (!hasSession) {
+        showLanding();
+      }
+    });
+  }
 })();
