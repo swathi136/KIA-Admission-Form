@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
 /* ============================================================
    KIA Batch Profile Analysis
@@ -277,6 +279,66 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
 .district-table tr:last-child td { border-bottom: 0; }
 .district-table td:last-child, .district-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .district-scroll { max-height: 300px; overflow-y: auto; }
+
+/* ---------- district map ---------- */
+.district-map-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: flex-start;
+}
+.district-map {
+  flex: 1 1 340px;
+  min-width: 260px;
+  max-width: 440px;
+}
+.district-map svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.district-map__path {
+  stroke: #FFFFFF;
+  stroke-width: 1;
+  cursor: default;
+  transition: opacity .15s ease;
+}
+.district-map__path:hover { opacity: .82; }
+.district-map__label {
+  font-family: var(--font-body);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+.district-map__legend { margin-top: 12px; }
+.district-map__legend-bar {
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #F1EEDA, #F4D58B, #E0AC3F, #B4790E, #6E8F5C, #2F6B4F, #12332A);
+}
+.district-map__legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-400);
+  margin-top: 4px;
+}
+.district-map.is-unavailable svg,
+.district-map.is-unavailable .district-map__legend {
+  display: none;
+}
+.district-list {
+  flex: 1 1 340px;
+  min-width: 260px;
+}
+.district-list__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--soil-700);
+  margin: 0 0 8px;
+}
 
 .footnote {
   margin-top: 28px;
@@ -906,6 +968,143 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     return div.innerHTML;
   }
 
+  /* ---------------- district map ----------------
+     Boundaries come from a small (~45 KB) public TopoJSON of Tamil Nadu's
+     districts (github.com/udit-001/india-maps-data), fetched once and
+     cached in `districtMapState`. Nothing here writes anywhere — it only
+     colors shapes by the counts already computed above. */
+  const DISTRICT_TOPO_URL = "https://raw.githubusercontent.com/udit-001/india-maps-data/273a91960b2317c8431e562942293de959e2bd68/topojson/states/tamilnadu.json";
+
+  // The boundary source's district names -> this page's canonical names
+  // (see CANONICAL_DISTRICTS above), so map counts line up with every
+  // other chart on this page.
+  const TOPO_DISTRICT_TO_CANONICAL = {
+    "Thiruvallur": "Tiruvallur", "Chennai": "Chennai", "Krishnagiri": "Krishnagiri",
+    "Tiruvannamalai": "Tiruvannamalai", "Dharmapuri": "Dharmapuri", "Salem": "Salem",
+    "Erode": "Erode", "Nilgiris": "The Nilgiris", "Namakkal": "Namakkal",
+    "Perambalur": "Perambalur", "Coimbatore": "Coimbatore", "Tiruchirappalli": "Tiruchirappalli",
+    "Ariyalur": "Ariyalur", "Tiruppur": "Tiruppur", "Thanjavur": "Thanjavur",
+    "Karur": "Karur", "Thiruvarur": "Tiruvarur", "Dindigul": "Dindigul",
+    "Madurai": "Madurai", "Theni": "Theni", "Virudhunagar": "Virudhunagar",
+    "Thoothukkudi": "Thoothukudi", "Kanyakumari": "Kanniyakumari", "Viluppuram": "Viluppuram",
+    "Cuddalore": "Cuddalore", "Pudukkottai": "Pudukottai", "Sivaganga": "Sivaganga",
+    "Ramanathapuram": "Ramanathapuram", "Nagapattinam": "Nagapattinam", "Kallakurichi": "Kallakurichi",
+    "Tenkasi": "Tenkasi", "Tirunelveli": "Tirunelveli", "Vellore": "Vellore",
+    "Ranipet": "Ranipet", "Tirupathur": "Tirupathur", "Kancheepuram": "Kancheepuram",
+    "Chengalpattu": "Chengalpattu"
+  };
+
+  // Mayiladuthurai was carved out of Nagapattinam/Thiruvarur in 2020; the
+  // boundary source predates that split and has no shape for it, so its
+  // count is folded into Nagapattinam's shape on the map only. The ranked
+  // list alongside the map still lists Mayiladuthurai on its own row.
+  const DISTRICT_MAP_MERGE_INTO = { "Mayiladuthurai": "Nagapattinam" };
+
+  // Warm amber (low) through to the dashboard's deep teal (high) — pulled
+  // straight from the CSS custom properties above (amber-600, teal-600,
+  // teal-900) so the map reads as part of the same palette as every other
+  // chart, instead of a flat single-hue ramp.
+  const MAP_ZERO_COLOR = "#F1EEDA";
+  const MAP_COLOR_STEPS = ["#F4D58B", "#E0AC3F", "#B4790E", "#6E8F5C", "#2F6B4F", "#12332A"];
+
+  let districtMapState = null; // { entries: [{ canonical, path, title, label }] }
+
+  function isDarkFill(hex) {
+    const c = hex.replace("#", "");
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.6;
+  }
+
+  function buildDistrictMapSvg(features) {
+    const width = 480, height = 560;
+    const projection = d3.geoMercator().fitSize([width, height], { type: "FeatureCollection", features });
+    const pathGen = d3.geoPath(projection);
+    const svgEl = document.getElementById("districtMapSvg");
+    if (!svgEl) return null;
+    svgEl.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svgEl.innerHTML = "";
+
+    const entries = features.map((feature) => {
+      const canonical = TOPO_DISTRICT_TO_CANONICAL[feature.properties.district] || feature.properties.district;
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("class", "district-map__path");
+      path.setAttribute("d", pathGen(feature));
+      path.setAttribute("fill", MAP_ZERO_COLOR);
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      path.appendChild(title);
+      svgEl.appendChild(path);
+
+      let label = null;
+      if (pathGen.area(feature) > 140) {
+        const center = pathGen.centroid(feature);
+        label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("class", "district-map__label");
+        label.setAttribute("x", center[0]);
+        label.setAttribute("y", center[1]);
+        svgEl.appendChild(label);
+      }
+
+      return { canonical, path, title, label };
+    });
+
+    return { entries };
+  }
+
+  async function loadDistrictMap() {
+    const container = document.getElementById("districtMapContainer");
+    const unavailable = document.getElementById("districtMapUnavailable");
+    try {
+      const response = await fetch(DISTRICT_TOPO_URL);
+      if (!response.ok) throw new Error("Map boundary request failed");
+      const topology = await response.json();
+      const objectKey = Object.keys(topology.objects)[0];
+      const geo = topojson.feature(topology, topology.objects[objectKey]);
+      districtMapState = buildDistrictMapSvg(geo.features);
+      if (unavailable) unavailable.hidden = true;
+      if (container) container.classList.remove("is-unavailable");
+    } catch (error) {
+      console.error("Could not load district map boundaries.", error);
+      districtMapState = null;
+      if (unavailable) unavailable.hidden = false;
+      if (container) container.classList.add("is-unavailable");
+    }
+  }
+
+  function drawDistrictMap(rows) {
+    if (!districtMapState) return;
+
+    const counts = countBy(rows, "district");
+    const mapCounts = new Map(counts);
+    Object.entries(DISTRICT_MAP_MERGE_INTO).forEach(([from, into]) => {
+      if (mapCounts.has(from)) {
+        mapCounts.set(into, (mapCounts.get(into) || 0) + mapCounts.get(from));
+      }
+    });
+
+    const max = districtMapState.entries.reduce((best, { canonical }) => Math.max(best, mapCounts.get(canonical) || 0), 0);
+    // Domain starts at 1, not 0, so the lightest step in MAP_COLOR_STEPS is
+    // reserved for the smallest nonzero district rather than being spent on
+    // "no data" (that gets its own MAP_ZERO_COLOR below).
+    const colorScale = max > 0 ? d3.scaleQuantize().domain([1, max]).range(MAP_COLOR_STEPS) : null;
+
+    districtMapState.entries.forEach(({ canonical, path, title, label }) => {
+      const value = mapCounts.get(canonical) || 0;
+      const fill = value > 0 && colorScale ? colorScale(value) : MAP_ZERO_COLOR;
+      path.setAttribute("fill", fill);
+      title.textContent = canonical + ": " + value + (value === 1 ? " student" : " students");
+      if (label) {
+        label.textContent = value > 0 ? String(value) : "";
+        label.setAttribute("fill", isDarkFill(fill) ? "#FFFFFF" : "#3A3F30");
+      }
+    });
+
+    const legendMax = document.getElementById("districtMapLegendMax");
+    if (legendMax) legendMax.textContent = max ? String(max) : "0";
+  }
+
   /* ---------------- build the page shell once ---------------- */
   function buildLayout() {
     SINGLE_CHARTS.forEach((config) => buildCard(config.id, config.title, false));
@@ -918,8 +1117,23 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     districtCard.innerHTML =
       '<div class="chart-card__head"><h2>Students by district</h2>' +
       '<span class="chart-card__n" id="n-districts"></span></div>' +
-      '<div id="districtHolder"></div>';
+      '<div class="district-map-wrap">' +
+        '<div class="district-map" id="districtMapContainer">' +
+          '<svg id="districtMapSvg" role="img" aria-label="Tamil Nadu map shaded by number of applicants per district"></svg>' +
+          '<div class="district-map__legend">' +
+            '<div class="district-map__legend-bar"></div>' +
+            '<div class="district-map__legend-labels"><span>0</span><span id="districtMapLegendMax">0</span></div>' +
+          '</div>' +
+          '<p class="chart-card__empty" id="districtMapUnavailable" hidden>Map boundaries could not be loaded — see the ranked list.</p>' +
+        '</div>' +
+        '<div class="district-list">' +
+          '<p class="district-list__label">Ranked list</p>' +
+          '<div id="districtHolder"></div>' +
+        '</div>' +
+      '</div>';
     chartGrid.appendChild(districtCard);
+
+    loadDistrictMap();
   }
 
   /* ---------------- data ---------------- */
@@ -964,6 +1178,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     CROSS_CHARTS.forEach((config) => drawCross(config, rows));
     drawCutoff(rows);
     drawDistricts(rows);
+    drawDistrictMap(rows);
 
     footnote.textContent = "Counted from " + filteredApplications.length +
       " submitted application" + (filteredApplications.length === 1 ? "" : "s") +
