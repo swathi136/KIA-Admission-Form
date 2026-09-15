@@ -525,7 +525,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
 
       const rawValues = Array.from(new Set(rows
         .map((row) => {
-          const value = key === "district" ? normalizeDistrict(row[key]) : cleanValue(row[key]);
+          const value = normalizeAnalyticsField(key, row[key]);
           return value === null || value === undefined || value === "" ? null : value;
         })
         .filter((value) => value !== null && value !== undefined && value !== "")))
@@ -554,8 +554,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
       return FILTER_CONFIG.every(({ key }) => {
         const selectedValue = filterState[key];
         if (!selectedValue || selectedValue === "All") return true;
-        if (key === "district") return normalizeDistrict(form[key]) === selectedValue;
-        return cleanValue(form[key]) === selectedValue;
+        return normalizeAnalyticsField(key, form[key]) === selectedValue;
       });
     });
   }
@@ -652,6 +651,70 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     return text === "" ? null : text;
   }
 
+  function normalizeText(value) {
+    const text = cleanValue(value);
+    if (!text) return null;
+    return text
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+      .replace(/(^|[\s-])([a-z])/g, (match, separator, letter) => separator + letter.toUpperCase());
+  }
+
+  function normalizeMappedText(value, mappings) {
+    const normalized = normalizeText(value);
+    if (!normalized) return null;
+    return mappings[normalized.toLowerCase()] || normalized;
+  }
+
+  const MOTHER_TONGUE_MAPPINGS = {
+    tamil: "Tamil",
+    english: "English",
+    malayalam: "Malayalam",
+    telugu: "Telugu",
+    kannada: "Kannada",
+    hindi: "Hindi"
+  };
+
+  const MEDIUM_OF_STUDY_MAPPINGS = {
+    english: "English",
+    tamil: "Tamil",
+    "english medium": "English",
+    "tamil medium": "Tamil Medium"
+  };
+
+  const BOARD_OF_STUDY_MAPPINGS = {
+    "state board": "State Board",
+    "state boar": "State Board",
+    "state government": "State Board",
+    "sate board government": "State Board",
+    cbse: "CBSE",
+    icse: "ICSE",
+    matriculation: "Matriculation"
+  };
+
+  function normalizeMotherTongue(value) {
+    return normalizeMappedText(value, MOTHER_TONGUE_MAPPINGS);
+  }
+
+  function normalizeMediumOfStudy(value) {
+    return normalizeMappedText(value, MEDIUM_OF_STUDY_MAPPINGS);
+  }
+
+  function normalizeBoardOfStudy(value) {
+    const normalized = normalizeText(value);
+    if (!normalized) return null;
+    const comparisonKey = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return BOARD_OF_STUDY_MAPPINGS[comparisonKey] || normalized;
+  }
+
+  function normalizeAnalyticsField(field, value) {
+    if (field === "district") return normalizeDistrict(value);
+    if (field === "motherTongue") return normalizeMotherTongue(value);
+    if (field === "mediumOfStudy") return normalizeMediumOfStudy(value);
+    if (field === "boardOfStudy") return normalizeBoardOfStudy(value);
+    return cleanValue(value);
+  }
+
   const CANONICAL_DISTRICTS = [
     "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri",
     "Dindigul", "Erode", "Kallakurichi", "Kancheepuram", "Karur", "Krishnagiri",
@@ -710,16 +773,36 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
   function normalizeAnalyticsForm(form) {
     if (!form || typeof form !== "object") return {};
     const normalized = { ...form };
+    const identity = form.identity && typeof form.identity === "object" ? form.identity : {};
+    const socialBackground = form.school_social_background && typeof form.school_social_background === "object"
+      ? form.school_social_background
+      : {};
     if (Object.prototype.hasOwnProperty.call(normalized, "district") && normalized.district !== null && normalized.district !== undefined) {
       normalized.district = normalizeDistrict(normalized.district);
     }
+
+    const motherTongue = identity.mother_tongue
+      ?? identity.motherTongue
+      ?? normalized.mother_tongue
+      ?? normalized.motherTongue;
+    const boardOfStudy = socialBackground.board_of_study
+      ?? socialBackground.boardOfStudy
+      ?? normalized.board_of_study
+      ?? normalized.boardOfStudy;
+    const mediumOfStudy = socialBackground.medium_of_study
+      ?? socialBackground.mediumOfStudy
+      ?? normalized.medium_of_study
+      ?? normalized.mediumOfStudy;
+    normalized.motherTongue = normalizeMotherTongue(motherTongue);
+    normalized.boardOfStudy = normalizeBoardOfStudy(boardOfStudy);
+    normalized.mediumOfStudy = normalizeMediumOfStudy(mediumOfStudy);
     return normalized;
   }
 
   function countBy(rows, field) {
     const counts = new Map();
     rows.forEach((row) => {
-      const value = field === "district" ? normalizeDistrict(row[field]) : cleanValue(row[field]);
+      const value = normalizeAnalyticsField(field, row[field]);
       if (!value) return;
       counts.set(value, (counts.get(value) || 0) + 1);
     });
@@ -849,7 +932,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     const colCounts = countBy(rows, config.colField);
     const colKeys = orderedEntries(colCounts, config.colOrder).map(([key]) => key);
 
-    const relevant = rows.filter((row) => cleanValue(row[config.rowField]) && cleanValue(row[config.colField]));
+    const relevant = rows.filter((row) => normalizeAnalyticsField(config.rowField, row[config.rowField]) && normalizeAnalyticsField(config.colField, row[config.colField]));
     document.getElementById("n-" + config.id).textContent = relevant.length ? relevant.length + " recorded" : "";
 
     if (!relevant.length || !rowKeys.length || !colKeys.length) {
@@ -860,7 +943,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     const datasets = colKeys.map((colKey, index) => ({
       label: (config.colRelabel && config.colRelabel[colKey]) || colKey,
       data: rowKeys.map((rowKey) => relevant.filter((row) =>
-        cleanValue(row[config.rowField]) === rowKey && cleanValue(row[config.colField]) === colKey).length),
+        normalizeAnalyticsField(config.rowField, row[config.rowField]) === rowKey && normalizeAnalyticsField(config.colField, row[config.colField]) === colKey).length),
       backgroundColor: SERIES[index % SERIES.length],
       borderRadius: 3
     }));
