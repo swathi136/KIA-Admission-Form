@@ -8,9 +8,11 @@ const supabaseClient = window.supabase.createClient(
     SUPABASE_PUBLISHABLE_KEY,
     {
         auth: {
-            // Staff must log in again whenever the page is reopened or refreshed.
-            persistSession: false,
-            autoRefreshToken: false,
+            // Preserve the existing staff session so the dashboard and analytics
+            // pages can reuse the same authenticated Supabase session without
+            // asking for credentials again while the same browser session is active.
+            persistSession: true,
+            autoRefreshToken: true,
             detectSessionInUrl: false
         }
     }

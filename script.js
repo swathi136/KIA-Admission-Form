@@ -52,6 +52,8 @@
   const admissionTypeSelect = document.getElementById("admissionType");
   const tnauRequiredIndicator = document.getElementById("tnauRequiredIndicator");
   const tnauOptionalIndicator = document.getElementById("tnauOptionalIndicator");
+  const dashboardPendingTotal = document.getElementById("dashboardPendingTotal");
+  const dashboardApprovedTotal = document.getElementById("dashboardApprovedTotal");
   let appMode = "student";
   let currentStaffApplicationId = "";
   let dashboardStatus = "Pending Review";
@@ -236,7 +238,6 @@
     const data = collectData();
     const prefillMap = {
       hostelName: data.studentName || "",
-      hostelCourse: data.course || "",
       hostelParentName: [data.fatherName, data.motherName].filter(Boolean).join(" / "),
       hostelDob: data.dob || "",
       hostelBloodGroup: data.bloodGroup === "Other" ? (data.bloodGroupOther || "") : (data.bloodGroup || ""),
@@ -565,13 +566,13 @@
   /* ---------------- Review rendering ---------------- */
   const REVIEW_GROUPS = [
     { title: "Identity", keys: ["studentName", "registerNumber", "dob", "gender", "bloodGroup", "nationality", "religion", "community", "caste", "motherTongue"] },
-    { title: "Admission", keys: ["tnauNumber", "admissionType", "admissionQuota", "firstGraduate", "hostelStatus", "course", "batch"] },
+    { title: "Admission", keys: ["tnauNumber", "admissionType", "admissionQuota", "firstGraduate", "hostelStatus"] },
     { title: "Contact", keys: ["studentMobile", "whatsapp", "email", "commAddress", "permAddress", "district", "state", "pincode", "emergency1", "emergency2"] },
     { title: "Class X education", keys: ["xBoard", "xSchool", "xSchoolAddress", "xPassing", "xMedium", "xMarks"] },
     { title: "Class XII education", keys: ["xiiBoard", "xiiSchool", "xiiSchoolAddress", "xiiPassing", "xiiMedium", "xiiMarks"] },
     { title: "XII subject marks", keys: ["mLanguage", "mEnglish", "mMaths", "mPhysics", "mChemistry", "mBiology", "mBotany", "mZoology", "mComputerScience", "mTotal", "xiiCutoff", "emisNumber"] },
     { title: "Family", keys: ["fatherName", "fatherQualification", "fatherOccupation", "fatherCompany", "fatherEmail", "fatherMobile", "motherName", "motherQualification", "motherOccupation", "motherCompany", "motherEmail", "motherMobile", "familyIncome"] },
-    { title: "School & social background", keys: ["boardOfStudy", "mediumOfStudy", "schoolType", "tamilXii", "familyBackground"] },
+    { title: "School & social background", keys: ["schoolType", "tamilXii"] },
     { title: "Agricultural background", keys: ["landAvailability", "landArea", "majorCrops", "landLocality", "residenceType"] },
     { title: "Official / bank information", keys: ["bankHolder", "holderRelationship", "bankName", "bankBranch", "bankAccount", "bankIfsc", "loanAccount", "loanIfsc", "loanBankBranch", "passportNumber", "aadhaarNumber"] }
   ];
@@ -718,6 +719,24 @@
     return dashboardApplications;
   }
 
+  async function loadDashboardTotals() {
+    const [pending, approved] = await Promise.all([
+      supabaseClient.rpc("list_pending_admissions", { p_status: "Pending Review" }),
+      supabaseClient.rpc("list_pending_admissions", { p_status: "Approved" })
+    ]);
+
+    if (pending.error) throw pending.error;
+    if (approved.error) throw approved.error;
+
+    const pendingTotal = (pending.data || []).length;
+    const approvedTotal = (approved.data || []).length;
+
+    if (dashboardPendingTotal) dashboardPendingTotal.textContent = String(pendingTotal);
+    if (dashboardApprovedTotal) dashboardApprovedTotal.textContent = String(approvedTotal);
+
+    return { pendingTotal, approvedTotal };
+  }
+
   async function savePendingApplication(application) {
     const { error } = await supabaseClient.rpc("save_pending_admission", {
       p_application_id: application.applicationId,
@@ -832,6 +851,20 @@
     staffEmailInput.focus();
   }
 
+  async function openDashboardIfSessionExists() {
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (!error && session) {
+        currentStaffEmail = session.user?.email || currentStaffEmail;
+        await showStaffDashboard();
+        return true;
+      }
+    } catch (error) {
+      console.error("Could not read the current Supabase session.", error);
+    }
+    return false;
+  }
+
   async function showStaffDashboard() {
     appMode = "staff";
     landingView.hidden = true;
@@ -841,7 +874,10 @@
     staffDashboardView.hidden = false;
     document.body.classList.remove("staff-review-mode");
     try {
-      await loadDashboardApplications();
+      await Promise.all([
+        loadDashboardTotals(),
+        loadDashboardApplications()
+      ]);
       renderDashboard();
     } catch (error) {
       console.error("Could not load the staff dashboard.", error);
@@ -872,7 +908,6 @@
       row.innerHTML = `
         <td>${escapeHtml(data.studentName || "")}</td>
         <td>${escapeHtml(data.registerNumber || application.applicationId)}</td>
-        <td>${escapeHtml(data.course || "")}</td>
         <td>${escapeHtml(data.admissionType || "")}</td>
         <td>${escapeHtml(data.studentMobile || "")}</td>
         <td>${escapeHtml(data.email || "")}</td>
@@ -1056,9 +1091,9 @@
     const doc = new jsPDF("p", "mm", "a4");
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
-    const margin = 14;
+    const margin = 8;
     const contentW = pageW - margin * 2;
-    let y = 18;
+    let y = 10;
     const hostelData = getHostelDataFromForm(data);
     const isHostel = String(data.hostelStatus || "").toLowerCase() === "yes";
     const displayPdfValue = (value) => {
@@ -1067,34 +1102,37 @@
     };
 
     const ensureSpace = (needed) => {
-      if (y + needed > pageH - 18) {
+      if (y + needed > pageH - 12) {
         doc.addPage();
-        y = 18;
+        y = 12;
       }
     };
 
     const sectionHeading = (title, fill = [24, 63, 52]) => {
-      ensureSpace(12);
+      ensureSpace(8);
       doc.setFillColor(...fill);
-      doc.rect(margin, y, contentW, 8, "F");
+      doc.rect(margin, y, contentW, 5.8, "F");
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9.5);
-      doc.text(title.toUpperCase(), margin + 3, y + 5.5);
-      y += 8;
+      doc.setFontSize(6.4);
+      doc.text(title.toUpperCase(), margin + 3, y + 3.8);
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.25);
+      doc.rect(pageW - margin - 8, y + 0.5, 5, 5);
+      y += 5.8;
     };
 
     const addPartHeader = (title) => {
-      ensureSpace(16);
+      ensureSpace(8);
       doc.setDrawColor(28, 62, 52);
-      doc.setLineWidth(0.5);
+      doc.setLineWidth(0.3);
       doc.line(margin, y, pageW - margin, y);
-      y += 4;
+      y += 2;
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(title, margin + 2, y + 3);
-      y += 10;
+      doc.setFontSize(8.8);
+      doc.text(title, margin + 2, y + 2.5);
+      y += 7;
     };
 
     const splitValue = (value, width) => {
@@ -1102,38 +1140,53 @@
       return doc.splitTextToSize(text || "", width);
     };
 
-    const valueLayout = (value, width, maxHeight = pageH - 36) => {
+    const valueLayout = (value, width, maxHeight = pageH - 24) => {
       const text = value === null || value === undefined || String(value).trim() === "" ? "" : String(value);
-      let fontSize = 8;
+      let fontSize = 5.3;
       let lines = [];
-      let lineHeight = 4.2;
+      let lineHeight = 2.6;
       do {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(fontSize);
         lines = text ? doc.splitTextToSize(String(text), width) : [""];
-        lineHeight = fontSize <= 6.5 ? 3.4 : 4.2;
-        if (8 + lines.length * lineHeight <= maxHeight || fontSize <= 5.5) break;
-        fontSize -= 0.5;
-      } while (fontSize >= 5.5);
+        lineHeight = fontSize <= 4.8 ? 2.3 : 2.6;
+        if (8 + lines.length * lineHeight <= maxHeight || fontSize <= 4.4) break;
+        fontSize -= 0.2;
+      } while (fontSize >= 4.4);
       return { lines, fontSize, lineHeight };
     };
 
     // One field per row provides a stable, readable layout even for long
     // addresses, names and descriptions. Long values are continued on a new
     // page inside their own bordered row instead of crossing borders.
-    const drawKeyValueTable = (title, rows) => {
-      if (!rows || !rows.length) return;
-      sectionHeading(title);
-      const labelW = 57;
-      const valueW = contentW - labelW;
-      const bottomMargin = 18;
+    const sectionHeadingAt = (title, x, width, fill = [24, 63, 52]) => {
+      doc.setFillColor(...fill);
+      doc.rect(x, y, width, 5.8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.4);
+      doc.text(title.toUpperCase(), x + 3, y + 3.8);
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.25);
+      doc.rect(x + width - 8, y + 0.5, 5, 5);
+      y += 5.8;
+    };
+
+    const drawKeyValueTableAt = (title, rows, x, width, yStart = y) => {
+      if (!rows || !rows.length) return y;
+      const prevY = y;
+      y = yStart;
+      sectionHeadingAt(title, x, width);
+      const labelW = Math.max(20, width * 0.42);
+      const valueW = width - labelW;
+      const bottomMargin = 12;
 
       rows.forEach(([label, rawValue]) => {
         const value = displayPdfValue(rawValue);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7.5);
+        doc.setFontSize(5.3);
         const labelLines = doc.splitTextToSize(String(label), labelW - 7);
-        const layout = valueLayout(value, valueW - 8, pageH - 40);
+        const layout = valueLayout(value, valueW - 8, pageH - 22);
         let remainingLines = layout.lines.slice();
         let continuation = false;
 
@@ -1142,40 +1195,57 @@
           if (availableHeight < 14) {
             doc.addPage();
             y = 18;
-            sectionHeading(`${title} (continued)`);
+            sectionHeadingAt(`${title} (continued)`, x, width);
           }
 
           const lineCapacity = Math.max(1, Math.floor((pageH - bottomMargin - y - 7) / layout.lineHeight));
           const valueLines = remainingLines.splice(0, lineCapacity);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
+          doc.setFontSize(5.3);
           const visibleLabelLines = continuation
             ? doc.splitTextToSize(`${label} (continued)`, labelW - 7)
             : labelLines;
           const rowHeight = Math.max(
-            12,
-            valueLines.length * layout.lineHeight + 7,
-            visibleLabelLines.length * 3.8 + 7
+            7,
+            valueLines.length * layout.lineHeight + 3,
+            visibleLabelLines.length * 2.5 + 3
           );
           const rowY = y;
           doc.setDrawColor(70, 70, 70);
           doc.setLineWidth(0.2);
-          doc.rect(margin, rowY, contentW, rowHeight);
-          doc.line(margin + labelW, rowY, margin + labelW, rowY + rowHeight);
+          doc.rect(x, rowY, width, rowHeight);
+          doc.line(x + labelW, rowY, x + labelW, rowY + rowHeight);
 
           doc.setTextColor(40, 40, 40);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7.5);
-          visibleLabelLines.forEach((line, index) => doc.text(line, margin + 3, rowY + 5 + index * 3.8));
+          doc.setFontSize(5.3);
+          visibleLabelLines.forEach((line, index) => doc.text(line, x + 3, rowY + 3.6 + index * 2.3));
 
           doc.setFont("helvetica", "normal");
           doc.setFontSize(layout.fontSize);
-          valueLines.forEach((line, index) => doc.text(String(line || ""), margin + labelW + 4, rowY + 5 + index * layout.lineHeight));
+          valueLines.forEach((line, index) => doc.text(String(line || ""), x + labelW + 4, rowY + 5 + index * layout.lineHeight));
           y = rowY + rowHeight;
           continuation = true;
         }
       });
-      y += 4;
+      const endY = y + 4;
+      y = prevY;
+      return endY;
+    };
+
+    const drawKeyValueTable = (title, rows) => {
+      const result = drawKeyValueTableAt(title, rows, margin, contentW, y);
+      y = result;
+      return result;
+    };
+
+    const drawSideBySideTables = (leftTitle, leftRows, rightTitle, rightRows) => {
+      const sideGap = 5;
+      const blockW = (contentW - sideGap) / 2;
+      const topY = y;
+      const leftEndY = drawKeyValueTableAt(leftTitle, leftRows, margin, blockW, topY);
+      const rightEndY = drawKeyValueTableAt(rightTitle, rightRows, margin + blockW + sideGap, blockW, topY);
+      y = Math.max(leftEndY, rightEndY);
     };
 
     const drawBlockTable = (title, rows, cols) => {
@@ -1195,10 +1265,10 @@
         doc.rect(left, headerY, tableW, 8, "F");
         doc.setTextColor(30, 30, 30);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7.8);
+        doc.setFontSize(6.2);
         let headerX = left;
         cols.forEach((col, idx) => {
-          doc.text((col.title || "").toUpperCase(), headerX + 3, headerY + 5.5);
+          doc.text((col.title || "").toUpperCase(), headerX + 3, headerY + 4.3);
           if (idx < cols.length - 1) doc.line(headerX + columnWidths[idx], headerY, headerX + columnWidths[idx], headerY + 8);
           headerX += columnWidths[idx];
         });
@@ -1235,39 +1305,41 @@
 
     const addDeclaration = (title, declarationText) => {
       sectionHeading(title, [67, 78, 73]);
-      const boxH = 34;
-      ensureSpace(boxH + 4);
+      const boxH = 20;
+      ensureSpace(boxH + 2);
       const boxY = y;
       doc.setDrawColor(70, 70, 70);
       doc.setLineWidth(0.2);
       doc.rect(margin, boxY, contentW, boxH);
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9.2);
+      doc.setFontSize(7.2);
       const lines = doc.splitTextToSize(declarationText, contentW - 10);
-      lines.forEach((line, idx) => doc.text(line, margin + 5, boxY + 8 + idx * 5));
-      const dateY = boxY + 25;
+      lines.forEach((line, idx) => doc.text(line, margin + 5, boxY + 6 + idx * 3.6));
+
+      const lineY = boxY + boxH - 6;
+      const labelY = lineY - 3.4;
       doc.setLineWidth(0.2);
-      doc.line(margin + 65, dateY, margin + 120, dateY);
-      doc.line(margin + 125, dateY, margin + contentW - 10, dateY);
+      doc.line(margin + 52, lineY, margin + 116, lineY);
+      doc.line(margin + 128, lineY, margin + contentW - 10, lineY);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.text("Student Signature:", margin + 10, dateY - 1);
-      doc.text("Date:", margin + 130, dateY - 1);
+      doc.setFontSize(6.8);
+      doc.text("Student Signature:", margin + 5, labelY);
+      doc.text("Date:", margin + 122, labelY);
       y = boxY + boxH + 8;
     };
 
     const addRoomAllocationField = () => {
-      ensureSpace(12);
+      ensureSpace(10);
       doc.setDrawColor(70, 70, 70);
       doc.setLineWidth(0.2);
-      doc.rect(margin, y, contentW, 10);
+      doc.rect(margin, y, contentW, 9);
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.text("Room Allocated (For Office Use):", margin + 4, y + 7);
-      doc.line(margin + 78, y + 8, pageW - margin - 8, y + 8);
-      y += 16;
+      doc.setFontSize(8.2);
+      doc.text("Room Allocated (For Office Use):", margin + 4, y + 6);
+      doc.line(margin + 78, y + 7, pageW - margin - 8, y + 7);
+      y += 14;
     };
 
     const addHeader = () => {
@@ -1320,42 +1392,14 @@
     addHeader();
     addPartHeader("PART A — COLLEGE ADMISSION FORM");
 
-    drawKeyValueTable("1. STUDENT & ADMISSION DETAILS", [
+    drawSideBySideTables("1. STUDENT & ADMISSION DETAILS", [
       ["Student Name", data.studentName || ""],
       ["TNAU Allotment Number", data.tnauNumber || ""],
       ["Admission Type", data.admissionType || ""],
       ["Admission Quota", data.admissionQuota || ""],
-      ["Course / Programme", data.course || ""],
       ["First Graduate", data.firstGraduate || ""],
-      ["Hosteller / Dayscholar", data.hostelStatus || ""],
-      ["Academic Year / Batch", data.batch || ""]
-    ]);
-
-    drawKeyValueTable("2. PERSONAL INFORMATION", [
-      ["Date of Birth", data.dob || ""],
-      ["Gender", data.gender || ""],
-      ["Blood Group", data.bloodGroup === "Other" ? (data.bloodGroupOther || "") : (data.bloodGroup || "")],
-      ["Nationality", data.nationality || ""],
-      ["Religion", data.religion || ""],
-      ["Community", data.community === "Other" ? (data.communityOther || "") : (data.community || "")],
-      ["Caste", data.caste || ""],
-      ["Mother Tongue", data.motherTongue || ""]
-    ]);
-
-    drawKeyValueTable("3. CONTACT & ADDRESS", [
-      ["Student Mobile", data.studentMobile || ""],
-      ["WhatsApp Number", data.whatsapp || ""],
-      ["Email ID", data.email || ""],
-      ["Communication Address", data.commAddress || ""],
-      ["Permanent Address", data.permAddress || ""],
-      ["District", data.district || ""],
-      ["State", data.state || ""],
-      ["PIN Code", data.pincode || ""],
-      ["Emergency Contact 1", data.emergency1 || ""],
-      ["Emergency Contact 2", data.emergency2 || ""]
-    ]);
-
-    drawKeyValueTable("4. EDUCATIONAL PROFILE - X STANDARD", [
+      ["Hosteller / Dayscholar", data.hostelStatus || ""]
+    ], "4. EDUCATIONAL PROFILE - X STANDARD", [
       ["Board", data.xBoard || ""],
       ["School Name", data.xSchool || ""],
       ["School Address", data.xSchoolAddress || ""],
@@ -1364,7 +1408,16 @@
       ["Marks", data.xMarks || ""]
     ]);
 
-    drawKeyValueTable("4. EDUCATIONAL PROFILE - XII STANDARD", [
+    drawSideBySideTables("2. PERSONAL INFORMATION", [
+      ["Date of Birth", data.dob || ""],
+      ["Gender", data.gender || ""],
+      ["Blood Group", data.bloodGroup === "Other" ? (data.bloodGroupOther || "") : (data.bloodGroup || "")],
+      ["Nationality", data.nationality || ""],
+      ["Religion", data.religion || ""],
+      ["Community", data.community === "Other" ? (data.communityOther || "") : (data.community || "")],
+      ["Caste", data.caste || ""],
+      ["Mother Tongue", data.motherTongue || ""]
+    ], "4. EDUCATIONAL PROFILE - XII STANDARD", [
       ["Board", data.xiiBoard || ""],
       ["School Name", data.xiiSchool || ""],
       ["School Address", data.xiiSchoolAddress || ""],
@@ -1406,11 +1459,8 @@
     ]);
 
     drawKeyValueTable("7. ADDITIONAL INFORMATION", [
-      ["Board of Study", data.boardOfStudy || ""],
-      ["Medium of Study", data.mediumOfStudy || ""],
       ["School Type", data.schoolType || ""],
-      ["Studied Tamil in XII", data.tamilXii || ""],
-      ["Family Background", data.familyBackground || ""]
+      ["Studied Tamil in XII", data.tamilXii || ""]
     ]);
 
     drawKeyValueTable("8. AGRICULTURAL / FAMILY BACKGROUND", [
@@ -1463,38 +1513,24 @@
     addDeclaration("10. COLLEGE ADMISSION DECLARATION", "I hereby declare that all the above furnished details are true to the best of my knowledge.");
 
     {
+      if (isHostel) {
+        doc.addPage();
+        y = 18;
+      }
       addPartHeader(isHostel ? "PART B — HOSTEL ADMISSION FORM" : "PART B — HOSTEL ADMISSION FORM (NOT SELECTED)");
 
       drawKeyValueTable("1. HOSTEL APPLICANT DETAILS", [
-        ["Roll No.", hostelData.rollNumber || ""],
         ["Name of Applicant", hostelData.applicantName || ""],
-        ["Course / Branch", hostelData.courseBranch || ""],
-        ["Father / Mother Name", hostelData.parentName || ""],
-        ["Date of Birth", hostelData.dateOfBirth || ""],
         ["Blood Group", hostelData.bloodGroup || ""],
         ["Allergy to any medicine", hostelData.medicineAllergy || ""],
-        ["Allergy Details", hostelData.allergyDetails || ""],
-        ["Email ID", hostelData.email || ""],
-        ["Mobile Number", hostelData.mobile || ""]
+        ["Allergy Details", hostelData.allergyDetails || ""]
       ]);
 
-      drawKeyValueTable("2. HOSTEL ADDRESS DETAILS", [
-        ["Address of Correspondence", hostelData.address || ""],
-        ["Correspondence Phone Number", hostelData.correspondencePhone || ""],
-        ["Permanent Address", hostelData.permanentAddress || ""],
-        ["Permanent Address Phone Number", hostelData.permanentPhone || ""]
-      ]);
-
-      drawKeyValueTable("3. LOCAL GUARDIAN DETAILS", [
+      drawKeyValueTable("2. LOCAL GUARDIAN DETAILS", [
         ["Local Guardian Name", hostelData.localGuardianName || ""],
         ["Local Guardian Address", hostelData.localGuardianAddress || ""],
         ["Local Guardian Phone Number", hostelData.localGuardianPhone || ""],
         ["Local Guardian Occupation / Designation", hostelData.localGuardianOccupation || ""]
-      ]);
-
-      drawKeyValueTable("4. PARENT OCCUPATION", [
-        ["Father's Occupation / Designation", hostelData.fatherOccupation || ""],
-        ["Mother's Occupation / Designation", hostelData.motherOccupation || ""]
       ]);
 
       const visitorRowsSource = hostelData.visitors && hostelData.visitors.length ? hostelData.visitors : [{ name: "", address: "", phone: "", relationship: "" }, { name: "", address: "", phone: "", relationship: "" }, { name: "", address: "", phone: "", relationship: "" }];
@@ -1505,7 +1541,7 @@
         visitor.phone || "",
         visitor.relationship || ""
       ]);
-      drawBlockTable("5. RELATIVES / VISITORS", [
+      drawBlockTable("3. RELATIVES / VISITORS", [
         ["S.No.", "Name", "Address", "Phone Number", "Relationship"],
         ...visitorRows
       ], [
@@ -1516,11 +1552,7 @@
         { title: "Relationship", width: 30 }
       ]);
 
-      drawKeyValueTable("6. HOLIDAY TRAVEL ARRANGEMENT", [
-        ["Holiday Travel Arrangement", hostelData.holidayTravel || ""]
-      ]);
-
-      drawKeyValueTable("7. EMERGENCY CONTACT", [
+      drawKeyValueTable("4. EMERGENCY CONTACT", [
         ["Name", hostelData.emergencyName || ""],
         ["Residence Phone Number", hostelData.emergencyResidencePhone || ""],
         ["Office Phone Number", hostelData.emergencyOfficePhone || ""],
@@ -1642,7 +1674,6 @@
     doc.setTextColor(90, 90, 90);
     const parts = [];
     if (data.batch) parts.push(`Batch ${data.batch}`);
-    if (data.course) parts.push(data.course);
     doc.text(parts.length ? parts.join("   \u2022   ") : " ", PDF.pageW / 2, y, { align: "center" });
     y += 5;
     doc.setDrawColor(...PDF.tealDark);
@@ -1882,7 +1913,14 @@
   renderRail();
   goTo(0);
   updateProgress();
-  if (portalRoute === "student") {
+  const shouldOpenStaffDashboard = new URLSearchParams(window.location.search).get("view") === "staff-dashboard";
+  if (shouldOpenStaffDashboard) {
+    openDashboardIfSessionExists().then((hasSession) => {
+      if (!hasSession) {
+        showLanding();
+      }
+    });
+  } else if (portalRoute === "student") {
     showStudentForm();
   } else if (portalRoute === "staff") {
     showStaffGate();
