@@ -570,20 +570,28 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
   const SINGLE_CHARTS = [
     { id: "gender", title: "Gender", field: "gender", type: "doughnut", order: ["Male", "Female", "Other"] },
     { id: "admissionType", title: "Admission type", field: "admissionType", type: "doughnut", order: ["Counselling", "Management"] },
-    { id: "hostelStatus", title: "Hostel accommodation", field: "hostelStatus", type: "doughnut", order: ["Yes", "No"], relabel: { Yes: "Hosteller", No: "Dayscholar" } },
+    { id: "hostelStatus", title: "Hosteller / Dayscholar", field: "hostelStatus", type: "doughnut", order: ["No", "Yes"], relabel: { Yes: "Hosteller", No: "Dayscholar" } },
     { id: "firstGraduate", title: "First graduate", field: "firstGraduate", type: "doughnut", order: ["Yes", "No"] },
     { id: "community", title: "Community", field: "community", type: "bar", order: ["OC", "BC", "BCM", "MBC", "DNC", "SC", "SCA", "ST"] },
-    { id: "admissionQuota", title: "Admission quota", field: "admissionQuota", type: "bar", order: ["General", "Management", "7.5% Academic", "General Vocational"] },
-    { id: "familyBackground", title: "Family background", field: "familyBackground", type: "doughnut", order: ["Agriculture", "Business", "Salaried", "Other"] },
-    { id: "schoolType", title: "School type", field: "schoolType", type: "bar", order: ["Government", "Government-aided", "Private", "Matriculation", "CBSE", "ICSE"] },
-    { id: "boardOfStudy", title: "Board of study", field: "boardOfStudy", type: "bar" },
-    { id: "mediumOfStudy", title: "Medium of study", field: "mediumOfStudy", type: "doughnut" },
-    { id: "residenceType", title: "Residence type", field: "residenceType", type: "doughnut", order: ["Own house", "Rented", "Farm house"] },
-    { id: "landLocality", title: "Agricultural land locality", field: "landLocality", type: "doughnut", order: ["Rural", "Semi-urban", "Urban"] },
+    { id: "admissionQuota", title: "Quota wise Students", field: "admissionQuota", type: "bar", order: ["General Academic", "Management", "7.5% Academic", "General Vocational"] },
+    { id: "familyBackground", title: "Family Background", field: "familyBackground", type: "doughnut", order: ["Farming", "Business", "Others"] },
+    { id: "mediumOfStudy", title: "Medium of Education", field: "mediumOfStudy", type: "doughnut", order: ["English", "Tamil"] },
+    { id: "schoolType", title: "School", field: "schoolType", type: "bar", order: ["Aided", "Government", "Private", "Other"] },
+    { id: "residenceType", title: "Residential Area", field: "residenceType", type: "doughnut", order: ["Own house", "Rented", "Farm house"] },
+    { id: "landLocality", title: "Residential Area", field: "landLocality", type: "doughnut", order: ["Rural", "Urban", "Semi Urban"] },
+    { id: "parentOccupation", title: "Parents Occupation", field: "parentOccupation", type: "bar", order: ["Private employee", "Government employee", "Others"] },
     { id: "motherTongue", title: "Mother tongue", field: "motherTongue", type: "bar" },
     { id: "religion", title: "Religion", field: "religion", type: "doughnut", order: ["Hindu", "Christian", "Muslim", "Other"] },
     { id: "bloodGroup", title: "Blood group", field: "bloodGroup", type: "bar", order: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] }
   ];
+
+  const BOARD_CHART = {
+    id: "boardOfStudy",
+    title: "Board of Study",
+    field: "boardOfStudy",
+    type: "bar",
+    order: ["State Board", "CBSE", "ICSE", "Matriculation", "Other"]
+  };
 
   // Cross-tabs: how one field breaks down across another.
   const CROSS_CHARTS = [
@@ -593,18 +601,21 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
       rowOrder: ["Male", "Female", "Other"], colOrder: ["Yes", "No"], colRelabel: { Yes: "Hosteller", No: "Dayscholar" }, wide: false },
     { id: "quotaByCommunity", title: "Admission quota by community", rowField: "community", colField: "admissionQuota",
       rowOrder: ["OC", "BC", "BCM", "MBC", "DNC", "SC", "SCA", "ST"],
-      colOrder: ["General", "Management", "7.5% Academic", "General Vocational"], wide: true }
+      colOrder: ["General Academic", "Management", "7.5% Academic", "General Vocational"], wide: true }
   ];
 
   // XII cut-off, bucketed the way the printed batch report presents it.
   const CUTOFF_BINS = [
-    { label: "≤ 120", min: -Infinity, max: 120.5 },
-    { label: "121–140", min: 120.5, max: 140.5 },
-    { label: "141–160", min: 140.5, max: 160.5 },
-    { label: "161–170", min: 160.5, max: 170.5 },
-    { label: "171–180", min: 170.5, max: 180.5 },
-    { label: "181–190", min: 180.5, max: 190.5 },
-    { label: "> 190", min: 190.5, max: Infinity }
+    { label: "100–120.5", min: -Infinity, max: 120.5 },
+    { label: "121–140.5", min: 120.5, max: 140.5 },
+    { label: "141–160.5", min: 140.5, max: 160.5 },
+    { label: "161–165.5", min: 160.5, max: 165.5 },
+    { label: "166–170.5", min: 165.5, max: 170.5 },
+    { label: "171–175.5", min: 170.5, max: 175.5 },
+    { label: "176–180.5", min: 175.5, max: 180.5 },
+    { label: "181–185.5", min: 180.5, max: 185.5 },
+    { label: "186–190", min: 185.5, max: 190 },
+    { label: "> 190", min: 190, max: Infinity }
   ];
 
   const charts = {};
@@ -682,16 +693,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     "tamil medium": "Tamil Medium"
   };
 
-  const BOARD_OF_STUDY_MAPPINGS = {
-    "state board": "State Board",
-    "state boar": "State Board",
-    "state government": "State Board",
-    "sate board government": "State Board",
-    cbse: "CBSE",
-    icse: "ICSE",
-    matriculation: "Matriculation"
-  };
-
   function normalizeMotherTongue(value) {
     return normalizeMappedText(value, MOTHER_TONGUE_MAPPINGS);
   }
@@ -700,18 +701,54 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     return normalizeMappedText(value, MEDIUM_OF_STUDY_MAPPINGS);
   }
 
+  function normalizeFamilyBackground(value) {
+    const key = cleanValue(value)?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key) return "Other";
+    if (key === "agriculture" || key === "farming") return "Farming";
+    if (key === "business") return "Business";
+    if (key === "salaried" || key === "other" || key === "others") return "Others";
+    return "Others";
+  }
+
+  function normalizeSchoolType(value) {
+    const key = cleanValue(value)?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (key === "government") return "Government";
+    if (key === "government aided" || key === "aided") return "Aided";
+    if (key === "private") return "Private";
+    return "Other";
+  }
+
+  function normalizeParentOccupation(value) {
+    const key = cleanValue(value)?.toLowerCase();
+    if (!key) return "Others";
+    if (key.includes("government")) return "Government employee";
+    if (key.includes("private")) return "Private employee";
+    return "Others";
+  }
+
   function normalizeBoardOfStudy(value) {
-    const normalized = normalizeText(value);
-    if (!normalized) return null;
-    const comparisonKey = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    return BOARD_OF_STUDY_MAPPINGS[comparisonKey] || normalized;
+    const comparisonKey = cleanValue(value)?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!comparisonKey) return "Other";
+
+    const isStateBoard = comparisonKey === "state" || comparisonKey === "stateboard" || comparisonKey === "tamil nadu" ||
+      /^(?:tamil nadu )?state(?: board)?(?: of (?:school )?(?:examinations|education))?(?: tamil nadu)?$/.test(comparisonKey);
+    if (isStateBoard) return "State Board";
+    if (/^(?:cbse|cbse board|central board of secondary education)$/.test(comparisonKey)) return "CBSE";
+    if (/^(?:icse|icse board|indian certificate of secondary education)$/.test(comparisonKey)) return "ICSE";
+    if (/^(?:matriculation|matriculation board)$/.test(comparisonKey)) return "Matriculation";
+    return "Other";
   }
 
   function normalizeAnalyticsField(field, value) {
     if (field === "district") return normalizeDistrict(value);
     if (field === "motherTongue") return normalizeMotherTongue(value);
-    if (field === "mediumOfStudy") return normalizeMediumOfStudy(value);
+    if (field === "mediumOfStudy") return normalizeMediumOfStudy(value) || "Other";
     if (field === "boardOfStudy") return normalizeBoardOfStudy(value);
+    if (field === "familyBackground") return normalizeFamilyBackground(value);
+    if (field === "schoolType") return normalizeSchoolType(value);
+    if (field === "parentOccupation") return normalizeParentOccupation(value);
+    if (field === "admissionQuota" && cleanValue(value)?.toLowerCase() === "general") return "General Academic";
+    if (["familyBackground", "residenceType", "landLocality"].includes(field)) return cleanValue(value) || "Other";
     return cleanValue(value);
   }
 
@@ -777,6 +814,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     const socialBackground = form.school_social_background && typeof form.school_social_background === "object"
       ? form.school_social_background
       : {};
+    const class10Education = form.class_10_education && typeof form.class_10_education === "object"
+      ? form.class_10_education
+      : {};
+    const class12Education = form.class_12_education && typeof form.class_12_education === "object"
+      ? form.class_12_education
+      : {};
     if (Object.prototype.hasOwnProperty.call(normalized, "district") && normalized.district !== null && normalized.district !== undefined) {
       normalized.district = normalizeDistrict(normalized.district);
     }
@@ -785,17 +828,34 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
       ?? identity.motherTongue
       ?? normalized.mother_tongue
       ?? normalized.motherTongue;
-    const boardOfStudy = socialBackground.board_of_study
-      ?? socialBackground.boardOfStudy
-      ?? normalized.board_of_study
-      ?? normalized.boardOfStudy;
+    const boardCandidates = [
+      class12Education.board_12th,
+      class12Education.board12th,
+      normalized.xiiBoard,
+      class10Education.board_10th,
+      class10Education.board10th,
+      normalized.xBoard,
+      socialBackground.board_of_study,
+      socialBackground.boardOfStudy,
+      normalized.board_of_study,
+      normalized.boardOfStudy
+    ];
+    const normalizedBoardCandidates = boardCandidates.map((value) => normalizeBoardOfStudy(value));
+    const boardOfStudy = normalizedBoardCandidates.find((value) => value && value !== "Other") || "Other";
     const mediumOfStudy = socialBackground.medium_of_study
       ?? socialBackground.mediumOfStudy
       ?? normalized.medium_of_study
       ?? normalized.mediumOfStudy;
+    const schoolType = socialBackground.school_type
+      ?? socialBackground.schoolType
+      ?? normalized.school_type
+      ?? normalized.schoolType;
+    const parentOccupation = normalized.fatherOccupation || normalized.motherOccupation;
     normalized.motherTongue = normalizeMotherTongue(motherTongue);
-    normalized.boardOfStudy = normalizeBoardOfStudy(boardOfStudy);
+    normalized.boardOfStudy = boardOfStudy;
     normalized.mediumOfStudy = normalizeMediumOfStudy(mediumOfStudy);
+    normalized.schoolType = normalizeSchoolType(schoolType);
+    normalized.parentOccupation = normalizeParentOccupation(parentOccupation);
     return normalized;
   }
 
@@ -804,6 +864,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     rows.forEach((row) => {
       const value = normalizeAnalyticsField(field, row[field]);
       if (!value) return;
+      counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    return counts;
+  }
+
+  function aggregateBoardOfStudy(rows) {
+    const counts = new Map();
+    rows.forEach((row) => {
+      const value = normalizeBoardOfStudy(row.boardOfStudy);
       counts.set(value, (counts.get(value) || 0) + 1);
     });
     return counts;
@@ -864,8 +933,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
   }
 
   /* ---------------- drawing ---------------- */
-  function drawSingle(config, rows) {
-    const counts = countBy(rows, config.field);
+  function drawSingle(config, rows, aggregatedCounts) {
+    const counts = aggregatedCounts || countBy(rows, config.field);
     const entries = orderedEntries(counts, config.order);
     const total = entries.reduce((sum, [, value]) => sum + value, 0);
     document.getElementById("n-" + config.id).textContent = total ? total + " recorded" : "";
@@ -974,15 +1043,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     });
   }
 
-  function drawCutoff(rows) {
+  function drawCutoff(id, rows) {
     const marks = rows
       .map((row) => parseFloat(String(row.xiiCutoff == null ? "" : row.xiiCutoff).replace(/[^0-9.]/g, "")))
       .filter((value) => !Number.isNaN(value) && value > 0);
 
-    const nLabel = document.getElementById("n-cutoff");
+    const nLabel = document.getElementById("n-" + id);
     if (!marks.length) {
       nLabel.textContent = "";
-      showEmpty("cutoff", "No cut-off marks recorded yet.");
+      showEmpty(id, "No cut-off marks recorded yet.");
       return;
     }
 
@@ -991,15 +1060,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
       " · highest " + Math.max(...marks).toFixed(1) + " · average " + average.toFixed(1);
 
     const values = CUTOFF_BINS.map((bin) => marks.filter((mark) => mark > bin.min && mark <= bin.max).length);
-    const canvas = restoreCanvas("cutoff");
+    const canvas = restoreCanvas(id);
 
-    if (charts.cutoff) {
-      charts.cutoff.data.datasets[0].data = values;
-      charts.cutoff.update();
+    if (charts[id]) {
+      charts[id].data.datasets[0].data = values;
+      charts[id].update();
       return;
     }
 
-    charts.cutoff = new Chart(canvas, {
+    charts[id] = new Chart(canvas, {
       type: "bar",
       data: {
         labels: CUTOFF_BINS.map((bin) => bin.label),
@@ -1190,10 +1259,13 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
 
   /* ---------------- build the page shell once ---------------- */
   function buildLayout() {
+    buildCard(BOARD_CHART.id, BOARD_CHART.title, false);
     SINGLE_CHARTS.forEach((config) => buildCard(config.id, config.title, false));
     CROSS_CHARTS.forEach((config) => buildCard(config.id, config.title, config.wide));
 
-    buildCard("cutoff", "Class XII cut-off spread", true);
+    buildCard("cutoffOverall", "Overall Cut-off Mark", true);
+    buildCard("cutoffCounselling", "Counselling Cut-off Mark", true);
+    buildCard("cutoffManagement", "Management Cut-off Mark", true);
 
     const districtCard = document.createElement("section");
     districtCard.className = "chart-card chart-card--wide";
@@ -1257,9 +1329,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; color: var(--te
     document.getElementById("pendingCount").textContent = pendingTotal;
     document.getElementById("approvedCount").textContent = approvedTotal;
 
+    drawSingle(BOARD_CHART, rows, aggregateBoardOfStudy(rows));
     SINGLE_CHARTS.forEach((config) => drawSingle(config, rows));
     CROSS_CHARTS.forEach((config) => drawCross(config, rows));
-    drawCutoff(rows);
+    drawCutoff("cutoffOverall", rows);
+    drawCutoff("cutoffCounselling", rows.filter((row) => row.admissionType === "Counselling"));
+    drawCutoff("cutoffManagement", rows.filter((row) => row.admissionType === "Management"));
     drawDistricts(rows);
     drawDistrictMap(rows);
 
