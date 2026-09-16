@@ -70,12 +70,25 @@ declare
   v_application_id text;
   v_registration_number text;
   v_submitted_at timestamptz;
+  v_admission_type text;
+  v_tnau_number text;
 begin
+  v_admission_type := lower(trim(coalesce(p_form ->> 'admissionType', '')));
+  v_tnau_number := trim(coalesce(p_form ->> 'tnauNumber', ''));
+
   if coalesce(trim(p_form ->> 'studentName'), '') = ''
-     or coalesce(trim(p_form ->> 'dob'), '') = ''
-     or coalesce(trim(p_form ->> 'tnauNumber'), '') = '' then
-    raise exception 'Student name, date of birth, and TNAU allotment number are required.'
+     or coalesce(trim(p_form ->> 'dob'), '') = '' then
+    raise exception 'Student name and date of birth are required.'
       using errcode = '22023';
+  end if;
+
+  if v_admission_type not in ('counselling', 'management') then
+    raise exception 'Admission type must be Counselling or Management.' using errcode = '22023';
+  end if;
+
+  if (v_admission_type = 'counselling' and v_tnau_number !~ '^[0-9]{12}$')
+     or (v_admission_type = 'management' and v_tnau_number <> '' and v_tnau_number !~ '^[0-9]{12}$') then
+    raise exception 'TNAU allotment number is required for Counselling and must contain exactly 12 digits when provided.' using errcode = '22023';
   end if;
 
   v_application_id := public.next_available_pending_application_id();

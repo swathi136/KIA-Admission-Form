@@ -48,6 +48,10 @@
   const applicationsTableBody = document.getElementById("applicationsTableBody");
   const dashboardEmpty = document.getElementById("dashboardEmpty");
   const applicationSearch = document.getElementById("applicationSearch");
+  const tnauNumberInput = document.getElementById("tnauNumber");
+  const admissionTypeSelect = document.getElementById("admissionType");
+  const tnauRequiredIndicator = document.getElementById("tnauRequiredIndicator");
+  const tnauOptionalIndicator = document.getElementById("tnauOptionalIndicator");
   let appMode = "student";
   let currentStaffApplicationId = "";
   let dashboardStatus = "Pending Review";
@@ -56,6 +60,7 @@
   let lastSubmittedApplication = null;
   let staffAuthMode = "signup";
   const TEST_STAFF_EMAIL = "swathi.24cs@kct.ac.in";
+  const portalRoute = new URLSearchParams(window.location.search).get("portal");
 
   function isAllowedStaffEmail(email) {
     const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -158,10 +163,38 @@
   }
 
   /* ---------------- Validation ---------------- */
+  function syncTnauValidation() {
+    if (!tnauNumberInput || !admissionTypeSelect) return;
+
+    const isCounselling = admissionTypeSelect.value === "Counselling";
+    const value = tnauNumberInput.value.trim();
+    tnauNumberInput.required = isCounselling;
+    if (tnauRequiredIndicator) tnauRequiredIndicator.hidden = !isCounselling;
+    if (tnauOptionalIndicator) tnauOptionalIndicator.hidden = isCounselling;
+
+    if (isCounselling && !value) {
+      tnauNumberInput.setCustomValidity("TNAU allotment number is required for Counselling admission.");
+    } else if (value && !/^\d{12}$/.test(value)) {
+      tnauNumberInput.setCustomValidity("TNAU allotment number must contain exactly 12 digits.");
+    } else {
+      tnauNumberInput.setCustomValidity("");
+    }
+
+    if (tnauNumberInput.checkValidity()) {
+      const field = tnauNumberInput.closest(".field");
+      if (field) {
+        field.classList.remove("has-error");
+        const error = field.querySelector(".field__error");
+        if (error) error.remove();
+      }
+    }
+  }
+
   function validateSection(index, silent) {
     const panel = panels[index];
     if (!panel || panel.hidden) return true;
-    const inputs = Array.from(panel.querySelectorAll("input[required], select[required]"));
+    syncTnauValidation();
+    const inputs = Array.from(panel.querySelectorAll("input[required], select[required], input[data-conditional-validation]"));
     let ok = true;
     inputs.forEach((input) => {
       const field = input.closest(".field") || input.closest(".checkbox");
@@ -185,6 +218,9 @@
     }
     return ok;
   }
+
+  if (admissionTypeSelect) admissionTypeSelect.addEventListener("change", syncTnauValidation);
+  if (tnauNumberInput) tnauNumberInput.addEventListener("input", syncTnauValidation);
 
   form.addEventListener("input", (e) => {
     const field = e.target.closest(".field");
@@ -739,6 +775,7 @@
       if (element.type === "checkbox") element.checked = !!value;
       else element.value = value == null ? "" : value;
     });
+    syncTnauValidation();
     const bloodGroupOtherField = document.getElementById("bloodGroupOtherField");
     const communityOtherField = document.getElementById("communityOtherField");
     if (bloodGroupOtherField) bloodGroupOtherField.style.display = data.bloodGroup === "Other" ? "block" : "none";
@@ -780,6 +817,19 @@
     staffReviewBar.hidden = true;
     staffFormBackBtn.hidden = true;
     document.body.classList.remove("staff-review-mode");
+  }
+
+  function showStaffGate() {
+    appMode = "staff";
+    landingView.hidden = false;
+    entryChoiceView.hidden = true;
+    staffGateView.hidden = false;
+    studentFormView.hidden = true;
+    staffDashboardView.hidden = true;
+    staffReviewBar.hidden = true;
+    staffFormBackBtn.hidden = true;
+    document.body.classList.remove("staff-review-mode");
+    staffEmailInput.focus();
   }
 
   async function showStaffDashboard() {
@@ -1719,13 +1769,11 @@
   }
 
   document.getElementById("studentEntryBtn").addEventListener("click", () => {
-    showStudentForm();
+    window.location.assign("student.html");
   });
 
   document.getElementById("staffEntryBtn").addEventListener("click", () => {
-    entryChoiceView.hidden = true;
-    staffGateView.hidden = false;
-    staffEmailInput.focus();
+    window.location.assign("staff.html");
   });
 
   document.getElementById("staffBackBtn").addEventListener("click", showLanding);
@@ -1829,8 +1877,14 @@
     hostelStatus.addEventListener("change", syncHostelStep);
   }
   loadDraft();
+  syncTnauValidation();
   syncHostelStep();
   renderRail();
   goTo(0);
   updateProgress();
+  if (portalRoute === "student") {
+    showStudentForm();
+  } else if (portalRoute === "staff") {
+    showStaffGate();
+  }
 })();

@@ -1,20 +1,7 @@
--- Connects the existing KIA admission tables to the public form.
--- Run this once in the Supabase SQL Editor after the table-creation SQL.
+-- Keeps TNAU optional for Management admission while preserving the required
+-- 12-digit rule for Counselling. This changes function validation only; it
+-- does not alter tables or existing records.
 
-alter table public.identity add column if not exists religion text;
-alter table public.contact add column if not exists student_mobile text;
-alter table public.admission add column if not exists registration_number text;
-alter table public.hostel_admission add column if not exists emergency_contact_name text;
-alter table public.hostel_admission add column if not exists declaration_accepted boolean not null default false;
-
-create unique index if not exists admission_registration_number_key
-  on public.admission (registration_number)
-  where registration_number is not null;
-
-create sequence if not exists public.admission_registration_sequence start with 1;
-
--- This RPC saves the parent and all related records in one database transaction.
--- The browser can submit applications but cannot read applicants' personal data.
 create or replace function public.submit_admission(
   p_form jsonb,
   p_achievements jsonb default '[]'::jsonb
@@ -35,8 +22,7 @@ begin
 
   if coalesce(trim(p_form ->> 'studentName'), '') = ''
      or coalesce(trim(p_form ->> 'dob'), '') = '' then
-    raise exception 'Student name and date of birth are required.'
-      using errcode = '22023';
+    raise exception 'Student name and date of birth are required.' using errcode = '22023';
   end if;
 
   if v_admission_type not in ('counselling', 'management') then
@@ -191,30 +177,107 @@ begin
 end;
 $$;
 
-alter table public.identity enable row level security;
-alter table public.admission enable row level security;
-alter table public.contact enable row level security;
-alter table public.class_10_education enable row level security;
-alter table public.class_12_education enable row level security;
-alter table public.class_12_subject_marks enable row level security;
-alter table public.family enable row level security;
-alter table public.school_social_background enable row level security;
-alter table public.agriculture_background enable row level security;
-alter table public.additional_official_information enable row level security;
-alter table public.achievements enable row level security;
-alter table public.hostel_admission enable row level security;
-
-revoke all on public.identity, public.admission, public.contact, public.class_10_education,
-  public.class_12_education, public.class_12_subject_marks, public.family,
-  public.school_social_background, public.agriculture_background,
-  public.additional_official_information, public.achievements, public.hostel_admission
-  from anon, authenticated;
-do $$
+create or replace function public.submit_pending_admission(
+  p_form jsonb,
+  p_achievements jsonb default '[]'::jsonb
+)
+returns table (application_id text, submitted_at timestamptz)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_application_id text;
+  v_registration_number text;
+  v_submitted_at timestamptz;
+  v_admission_type text;
+  v_tnau_number text;
 begin
-  if to_regclass('public.hostel_admission_details') is not null then
-    revoke all on public.hostel_admission_details from anon, authenticated;
+  v_admission_type := lower(trim(coalesce(p_form ->> 'admissionType', '')));
+  v_tnau_number := trim(coalesce(p_form ->> 'tnauNumber', ''));
+
+  if coalesce(trim(p_form ->> 'studentName'), '') = ''
+     or coalesce(trim(p_form ->> 'dob'), '') = '' then
+    raise exception 'Student name and date of birth are required.' using errcode = '22023';
   end if;
+
+  if v_admission_type not in ('counselling', 'management') then
+    raise exception 'Admission type must be Counselling or Management.' using errcode = '22023';
+  end if;
+
+  if (v_admission_type = 'counselling' and v_tnau_number !~ '^[0-9]{12}$')
+     or (v_admission_type = 'management' and v_tnau_number <> '' and v_tnau_number !~ '^[0-9]{12}$') then
+    raise exception 'TNAU allotment number is required for Counselling and must contain exactly 12 digits when provided.' using errcode = '22023';
+  end if;
+
+  v_application_id := public.next_available_pending_application_id();
+  v_registration_number := public.next_available_admission_registration_number();
+
+  insert into public.pending_admission_applications (
+    application_id, registration_number, form_data, achievements
+  ) values (
+    v_application_id, v_registration_number, p_form,
+    coalesce(p_achievements, '[]'::jsonb)
+  ) returning pending_admission_applications.submitted_at into v_submitted_at;
+
+  return query select v_application_id, v_submitted_at;
 end;
 $$;
+
+create or replace function public.submit_pending_admission_with_registration(
+  p_form jsonb,
+  p_achievements jsonb default '[]'::jsonb
+)
+returns table (
+  application_id text,
+  registration_number text,
+  submitted_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_application_id text;
+  v_registration_number text;
+  v_submitted_at timestamptz;
+  v_admission_type text;
+  v_tnau_number text;
+begin
+  v_admission_type := lower(trim(coalesce(p_form ->> 'admissionType', '')));
+  v_tnau_number := trim(coalesce(p_form ->> 'tnauNumber', ''));
+
+  if coalesce(trim(p_form ->> 'studentName'), '') = ''
+     or coalesce(trim(p_form ->> 'dob'), '') = '' then
+    raise exception 'Student name and date of birth are required.' using errcode = '22023';
+  end if;
+
+  if v_admission_type not in ('counselling', 'management') then
+    raise exception 'Admission type must be Counselling or Management.' using errcode = '22023';
+  end if;
+
+  if (v_admission_type = 'counselling' and v_tnau_number !~ '^[0-9]{12}$')
+     or (v_admission_type = 'management' and v_tnau_number <> '' and v_tnau_number !~ '^[0-9]{12}$') then
+    raise exception 'TNAU allotment number is required for Counselling and must contain exactly 12 digits when provided.' using errcode = '22023';
+  end if;
+
+  v_application_id := public.next_available_pending_application_id();
+  v_registration_number := public.next_available_admission_registration_number();
+
+  insert into public.pending_admission_applications (
+    application_id, registration_number, form_data, achievements
+  ) values (
+    v_application_id, v_registration_number, p_form,
+    coalesce(p_achievements, '[]'::jsonb)
+  ) returning pending_admission_applications.submitted_at into v_submitted_at;
+
+  return query select v_application_id, v_registration_number, v_submitted_at;
+end;
+$$;
+
 revoke all on function public.submit_admission(jsonb, jsonb) from public;
 grant execute on function public.submit_admission(jsonb, jsonb) to anon, authenticated;
+revoke all on function public.submit_pending_admission(jsonb, jsonb) from public;
+grant execute on function public.submit_pending_admission(jsonb, jsonb) to anon, authenticated;
+revoke all on function public.submit_pending_admission_with_registration(jsonb, jsonb) from public;
+grant execute on function public.submit_pending_admission_with_registration(jsonb, jsonb) to anon, authenticated;

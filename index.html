@@ -183,8 +183,8 @@
         </div>
         <div class="grid">
           <div class="field">
-            <label for="tnauNumber">TNAU allotment number <span class="req">*</span></label>
-            <input type="text" id="tnauNumber" name="tnauNumber" required>
+            <label for="tnauNumber">TNAU allotment number <span class="req" id="tnauRequiredIndicator">*</span><span id="tnauOptionalIndicator" hidden> (optional for Management)</span></label>
+            <input type="text" id="tnauNumber" name="tnauNumber" pattern="[0-9]{12}" maxlength="12" inputmode="numeric" data-conditional-validation="tnau" title="Enter exactly 12 digits">
           </div>
           <div class="field">
             <label for="admissionType">Admission type <span class="req">*</span></label>
